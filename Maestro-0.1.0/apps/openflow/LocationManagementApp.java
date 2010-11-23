@@ -42,7 +42,6 @@ public class LocationManagementApp extends App {
 	}
 		
 	FlowsInView fis = new FlowsInView();
-	LinkedList<PacketInEvent> undone = new LinkedList<PacketInEvent>();
 		
 	LinkedList<PacketInEvent> work = null;
 	synchronized (pis.queues) {
@@ -70,10 +69,7 @@ public class LocationManagementApp extends App {
 		if (Utilities.whetherMACBroadCast(pi.flow.dlDst)) {
 		    fis.queue.addLast(new FlowsInView.FlowIn(pi, RegisteredHostsView.MAC_Broad_Cast));
 		} else {
-		    undone.addLast(pi);
-		    Utilities.printlnDebug(String.format("Unregistered MAC: %d-%d-%d-%d-%d-%d",
-						     pi.flow.dlDst[0], pi.flow.dlDst[1], pi.flow.dlDst[2], 
-						     pi.flow.dlDst[3], pi.flow.dlDst[4], pi.flow.dlDst[5]));
+		    fis.queue.addLast(new FlowsInView.FlowIn(pi, RegisteredHostsView.Location_Unknown));
 		}
 	    } else {
 		fis.queue.addLast(new FlowsInView.FlowIn(pi, dst));
@@ -81,13 +77,7 @@ public class LocationManagementApp extends App {
 	}
 
 	synchronized(Parameters.count) {
-	    Parameters.count.value += work.size() - undone.size();
-	}
-		
-	if (undone.size() > 0) {
-	    synchronized (pis.incoming) {
-		pis.incoming.addAll(undone);
-	    }
+	    Parameters.count.value += work.size();
 	}
 		
 	ViewsIOBucket output = new ViewsIOBucket();

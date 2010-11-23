@@ -48,7 +48,9 @@ public class RouteFlowApp extends App {
 	    //. This is a broadcast packet, send it out to OFPP_FLOOD
 	    if (fl.dst == RegisteredHostsView.MAC_Broad_Cast) {
 		config.addFlowModEvent(createFlowModAdd(fl.pi, fl.pi.dpid, OFPConstants.OfpPort.OFPP_FLOOD));
-		addPacketOutBasedOnIfBuffered(fl.pi, OFPConstants.OfpPort.OFPP_FLOOD, pkts);
+		addPacketOut(fl.pi, OFPConstants.OfpPort.OFPP_FLOOD, pkts);
+	    } else if (fl.dst == RegisteredHostsView.Location_Unknown) {
+		addPacketOut(fl.pi, OFPConstants.OfpPort.OFPP_FLOOD, pkts);
 	    } else { //. Regular packet
 		long from = fl.pi.dpid;
 		long to = fl.dst.dpid;
@@ -62,13 +64,13 @@ public class RouteFlowApp extends App {
 			if (fl.pi.inPort != fl.dst.port) {
 			    //. Add the flow entry
 			    config.addFlowModEvent(createFlowModAdd(fl.pi, from, fl.dst.port));
-			    addPacketOutBasedOnIfBuffered(fl.pi, fl.dst.port, pkts);
+			    addPacketOut(fl.pi, fl.dst.port, pkts);
 			}
 		    }
 		    continue;
 		}
 			
-		addPacketOutBasedOnIfBuffered(fl.pi, rtv.port, pkts);
+		addPacketOut(fl.pi, rtv.port, pkts);
 			
 		long next = rtv.next;
 		while (current != to) {
@@ -127,12 +129,7 @@ public class RouteFlowApp extends App {
 	return fm;
     }
 
-    private void addPacketOutBasedOnIfBuffered(PacketInEvent pi, int port, PacketsOutView pkts) {
-	//. The packet is already buffered, so no need to send it back
-	if (OFPConstants.OP_UNBUFFERED_BUFFER_ID != pi.bufferId) {
-	    return;
-	}
-
+    private void addPacketOut(PacketInEvent pi, int port, PacketsOutView pkts) {
 	PacketOutEvent po;
 	if (Parameters.useMemoryMgnt) {
 	    po = Parameters.am.memMgr.allocPacketOutEvent();

@@ -184,7 +184,7 @@ public class openflow extends Driver {
     
     public void start() {
     	try {
-	    int port = 2525;
+	    int port = Parameters.listenPort;
 	    s = Selector.open();
 	    ServerSocketChannel acceptChannel = ServerSocketChannel.open();
 	    acceptChannel.configureBlocking(false);

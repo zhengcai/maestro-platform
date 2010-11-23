@@ -59,6 +59,8 @@ public class Main {
 		    Parameters.queueUpperBound = Integer.parseInt(words[1]);
 		} else if (words[0].compareToIgnoreCase("outputLog") == 0) {
 		    Utilities.openLogFile(words[1]);
+		} else if (words[0].compareToIgnoreCase("port") == 0) {
+		    Parameters.listenPort = Integer.parseInt(words[1]);
 		} else {
 		    
 		}
