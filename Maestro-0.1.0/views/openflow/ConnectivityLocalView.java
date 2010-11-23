@@ -28,7 +28,6 @@ import views.View;
 import events.Event;
 
 public class ConnectivityLocalView extends View {
-    private static final long serialVersionUID = 4124422538006966377L;
     public static final int linkCostMax = Integer.MAX_VALUE / 3;
 	
     /** 
@@ -59,6 +58,11 @@ public class ConnectivityLocalView extends View {
 			
 	    // Default cost 1
 	    cost = 1;
+	}
+
+	@Override
+	    public String toString() {
+	    return String.format("Link dpid(port)--dpid(port): %d(%d)--%d(%d) cost %d", A, portA, B, portB, cost);
 	}
     }
 
@@ -179,4 +183,10 @@ public class ConnectivityLocalView extends View {
 	return false;
     }
 
+    @Override
+	public void print() {
+	for (Link l : getAllLinks()) {
+	    System.out.println(l);
+	}
+    }
 }

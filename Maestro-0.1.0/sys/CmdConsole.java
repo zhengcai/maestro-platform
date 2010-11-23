@@ -21,6 +21,7 @@ import java.io.*;
 
 import events.openflow.PacketInEvent;
 import views.openflow.ConnectivityLocalView;
+import views.View;
 
 
 /**
@@ -46,11 +47,22 @@ public class CmdConsole extends Thread {
 	    String s;
 	    try {
 		while ((s = in.readLine()).length() != 0) {
-		    if (s.compareTo("conn-local") == 0) {
-        				
-		    }
-		    if (s.compareTo("routing-intra") == 0) {
-        				
+		    if (s.compareTo("print") == 0) {
+			System.out.println("  Please input the name of the view instance:");
+			System.out.print("=>");
+			s = in.readLine();
+			if (0 == s.length()) {
+			    System.out.println("  Error reading the name of the view instance!");
+			    System.out.print("->");
+			    continue;
+			}
+			View v = viewManager.getViewInstance(s);
+			if (null == v) {
+			    System.out.println("  Cannot find the view instance with name "+s);
+			    System.out.print("->");
+			    continue;
+			}
+			v.print();
 		    }
 		    if (s.compareTo("help") == 0 || s.compareTo("h") == 0) {
 			printOptions();
@@ -88,8 +100,7 @@ public class CmdConsole extends Thread {
 	
     public void printOptions() {
     	System.out.println("=====================================================================");
-    	System.out.println("| (conn-local)        Trace the current ConnectivityLocalView       |");
-    	System.out.println("| (routing-intra)     Trace the current RoutingIntraView            |");
+    	System.out.println("| (print)             Call a particular view's print function       |");
     	System.out.println("| (help/h)            Print all options again                       |");
 	System.out.println("| (1)                 Run function1()                               |");
     	System.out.println("| (quit)              Quit Maestro                                  |");

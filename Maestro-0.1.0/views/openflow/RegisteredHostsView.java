@@ -25,8 +25,6 @@ import sys.Utilities;
 import views.View;
 
 public class RegisteredHostsView extends View {
-    private static final long serialVersionUID = 3100268063129687196L;
-	
     public static class Location {
 	public long dpid;
 	public int port;
@@ -70,4 +68,8 @@ public class RegisteredHostsView extends View {
 	return false;
     }
 
+    @Override
+	public void print() {
+
+    }
 }

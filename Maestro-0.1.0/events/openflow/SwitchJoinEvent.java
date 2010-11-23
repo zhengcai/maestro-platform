@@ -44,8 +44,9 @@ public class SwitchJoinEvent extends Event {
     public long actions;
     public int nPorts;
     public PhysicalPort[] ports;
-	
-    public String toString() {
+
+    @Override
+	public String toString() {
 	return String.format("Switch %d: nBuffer=%d, nTables=%d, capabilities=%d, actions=%d, nPorts=%d",
 			     dpid, nBuffers, nTables, capabilities, actions, nPorts);
     }

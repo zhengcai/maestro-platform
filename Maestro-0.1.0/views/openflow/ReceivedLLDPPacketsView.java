@@ -1,3 +1,20 @@
+/*
+  Copyright (C) 2010 Zheng Cai
+
+  Maestro is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  Maestro is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with Maestro.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package views.openflow;
 
 import java.util.LinkedList;
@@ -9,35 +26,37 @@ import events.openflow.LLDPPacketInEvent;
 import views.View;
 
 public class ReceivedLLDPPacketsView extends View {
-	private static final long serialVersionUID = -5946439688732915769L;
+    public LinkedList<LLDPPacketInEvent> lldps;
 	
-	public LinkedList<LLDPPacketInEvent> lldps;
-	
-	public ReceivedLLDPPacketsView() {
-		lldps = new LinkedList<LLDPPacketInEvent>();
-	}
+    public ReceivedLLDPPacketsView() {
+	lldps = new LinkedList<LLDPPacketInEvent>();
+    }
 
-	@Override
+    @Override
 	public void commit(Driver driver) {
 
-	}
+    }
 
-	@Override
+    @Override
 	public boolean processEvent(Event e) {
-		if (e instanceof LLDPPacketInEvent) {
-			acquireWrite();
-			lldps.addLast((LLDPPacketInEvent)e);
-			releaseWrite();
-			return true;
-		}
-		return false;
+	if (e instanceof LLDPPacketInEvent) {
+	    acquireWrite();
+	    lldps.addLast((LLDPPacketInEvent)e);
+	    releaseWrite();
+	    return true;
 	}
+	return false;
+    }
 
-	@Override
+    @Override
 	public boolean whetherInterested(Event e) {
-		if (e instanceof LLDPPacketInEvent)
-			return true;
-		return false;
-	}
+	if (e instanceof LLDPPacketInEvent)
+	    return true;
+	return false;
+    }
 
+    @Override
+	public void print() {
+
+    }
 }

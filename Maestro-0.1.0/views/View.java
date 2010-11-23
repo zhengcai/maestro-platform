@@ -30,62 +30,68 @@ import events.*;
  *
  */
 public abstract class View implements Serializable {
-	/** Unique ID for Serializable */
-	private static final long serialVersionUID = 5529001310172642894L;
+    /** Unique ID for Serializable */
+    private static final long serialVersionUID = 5529001310172642894L;
 	
-	/**
-	 * Semaphore used to synchronize critical section, such as modification
-	 * to data structures
-	 * TODO: Very primitive design, requires that apps use such semaphores
-	 *       need to be redesigned later
-	 */
-	public Semaphore sem;
+    /**
+     * Semaphore used to synchronize critical section, such as modification
+     * to data structures
+     * TODO: Very primitive design, requires that apps use such semaphores
+     *       need to be redesigned later
+     */
+    public Semaphore sem;
 
-	public void acquireRead() {
-		/*try {
-			sem.acquire();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}*/
+    public void acquireRead() {
+	/*try {
+	  sem.acquire();
+	  } catch (InterruptedException e) {
+	  e.printStackTrace();
+	  }*/
+    }
+	
+    public void releaseRead() {
+	//sem.release();
+    }
+	
+    public void acquireWrite() {
+	try {
+	    sem.acquire();
+	} catch (InterruptedException e) {
+	    e.printStackTrace();
 	}
+    }
 	
-	public void releaseRead() {
-		//sem.release();
-	}
+    public void releaseWrite() {
+	sem.release();
+    }
 	
-	public void acquireWrite() {
-		try {
-			sem.acquire();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-	}
+    public View() {
+	sem = new Semaphore(1);
+    }
 	
-	public void releaseWrite() {
-		sem.release();
-	}
+    /**
+     * Check whether this view is interested(capable) for handling this event
+     * @param e the event to check against
+     * @return true if interested, false otherwise
+     */
+    public abstract boolean whetherInterested(Event e);
 	
-	public View() {
-		sem = new Semaphore(1);
-	}
+    /**
+     * Process one event this view has registered for
+     * @param e The incoming event
+     * @return Whether this view should be considered as changed, to trigger DAGs to run
+     */
+    public abstract boolean processEvent(Event e);
 	
-	/**
-	 * Check whether this view is interested(capable) for handling this event
-	 * @param e the event to check against
-	 * @return true if interested, false otherwise
-	 */
-	public abstract boolean whetherInterested(Event e);
-	
-	/**
-	 * Process one event this view has registered for
-	 * @param e The incoming event
-	 * @return Whether this view should be considered as changed, to trigger DAGs to run
-	 */
-	public abstract boolean processEvent(Event e);
-	
-	/** 
-	 * Commit this view, generate necessary configuration messages
-	 * and send to the network
-	 */
-	public abstract void commit(Driver driver);
+    /** 
+     * Commit this view, generate necessary configuration messages
+     * and send to the network
+     */
+    public abstract void commit(Driver driver);
+
+    /**
+     * Let this view print out its content to System.out
+     * How to format is done by the view
+     */
+    public abstract void print();
 }

@@ -79,10 +79,6 @@ public class Main {
      * @param args the command line arguments
      */
     public static void main(String[] args) throws Exception {
-	long test = (((long)1) << 32) - 1;
-	System.err.println(test);
-
-	
 	if (args.length != 2) {
 	    System.err.println("Usage: parameter-configuration-file dag-file");
 	    System.exit(0);

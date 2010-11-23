@@ -26,8 +26,6 @@ import events.Event;
 import events.openflow.PacketInEvent;
 
 public class PacketsInView extends View {
-    private static final long serialVersionUID = 3959412140146440355L;
-    
     public LinkedList<LinkedList<PacketInEvent>> queues;
     public LinkedList<PacketInEvent> incoming;
     
@@ -38,7 +36,7 @@ public class PacketsInView extends View {
 
     @Override
 	public void commit(Driver driver) {
-		
+	
     }
 
     @Override
@@ -74,5 +72,10 @@ public class PacketsInView extends View {
 	if (e instanceof PacketInEvent)
 	    return true;
 	return false;
+    }
+
+    @Override
+	public void print() {
+
     }
 }

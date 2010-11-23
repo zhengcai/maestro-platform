@@ -26,10 +26,6 @@ import events.openflow.SwitchJoinEvent;
 import events.openflow.SwitchLeaveEvent;
 
 public class JoinedSwitchesView extends View {
-
-    /** Unique ID for Serializable */
-    private static final long serialVersionUID = -3371981634530881572L;
-	
     /** All switches that exist in the network */
     public HashMap<Long, SwitchJoinEvent> all;
 
@@ -81,5 +77,12 @@ public class JoinedSwitchesView extends View {
     private boolean handleSwitchLeaveEvent(SwitchLeaveEvent sl) {
 	// TODO: Incomplete implementation
 	return false;
+    }
+
+    @Override
+	public void print() {
+	for (SwitchJoinEvent e : all.values()) {
+	    System.out.println(e);
+	}
     }
 }
