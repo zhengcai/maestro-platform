@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project basedir="." default="build" name="Maestro-0.1.0">
+    <property environment="env"/>
+    <property name="debuglevel" value="source,lines,vars"/>
+    <property name="target" value="1.6"/>
+    <property name="source" value="1.6"/>
+    <path id="Maestro-0.1.0.classpath">
+        <pathelement location="build"/>
+    </path>
+    <target name="init">
+        <mkdir dir="build"/>
+        <!--copy includeemptydirs="false" todir="build">
+            <fileset dir=".">
+                <exclude name="**/*.launch"/>
+                <exclude name="**/*.java"/>
+            </fileset>
+        </copy-->
+    </target>
+    <target name="clean">
+        <delete dir="build"/>
+	<delete dir="javadoc"/>
+    </target>
+    <target depends="clean" name="cleanall"/>
+    <target depends="build-subprojects,build-project" name="build"/>
+    <target name="build-subprojects"/>
+    <target depends="init" name="build-project">
+        <echo message="${ant.project.name}: ${ant.file}"/>
+        <javac debug="true" debuglevel="${debuglevel}" destdir="build" source="${source}" target="${target}">
+            <src path="."/>
+            <classpath refid="Maestro-0.1.0.classpath"/>
+        </javac>
+    </target>
+    <target name="javadoc" description="Create Javadocs for the code">
+      <mkdir dir="javadoc"/>
+      <javadoc
+	 destdir="javadoc">
+	<fileset dir="${basedir}/" includes="**/*.java" />
+      </javadoc>
+    </target>
+</project>

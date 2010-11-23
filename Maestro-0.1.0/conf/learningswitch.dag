@@ -1,0 +1,41 @@
+# Which set of applications, events, views and driver should Maestro load?
+Bundle openflow
+
+# Declare all view instances that will be in the global environment
+Views
+  JoinedSwitchesView switches
+  PacketsInView packets_in_1
+  LearnedMACsView macs
+End Views
+
+# Describe event-view relation
+Events
+  SwitchJoinEvent by switches
+  SwitchLeaveEvent by switches
+  PacketInEvent by packets_in_1
+End Events
+
+# Define all DAGs to run in the system
+DAGs
+Begin DAG 1
+  RedundantWaiting
+  Node a Activation
+    Input PacketsInView packets_in_1
+  End Node
+  Node n1 LearningSwitchesApp
+    Input PacketsInView packets_in_1
+    Input JoinedSwitchesView switches
+    Input LearnedMACsView macs
+    Output FlowConfigView flow_config
+    Output PacketsOutView packets_out
+    Output LearnedMACsView macs
+  End Node
+  Node t Terminal
+    Output FlowConfigView flow_config
+    Output LearnedMACsView macs
+    Output PacketsOutView packets_out
+  End Node
+  Edge a->n1
+  Edge n1->t
+End DAG 1
+End DAGs

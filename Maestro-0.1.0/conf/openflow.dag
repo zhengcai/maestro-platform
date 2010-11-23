@@ -1,0 +1,307 @@
+# Which set of applications, events, views and driver should Maestro load?
+Bundle openflow
+
+# Declare all view instances that will be in the global environment
+Views
+  JoinedSwitchesView switches
+  ConnectivityLocalView conn_local
+  RoutingIntraView routing_intra
+  PacketsInView packets_in_1
+  PacketsInView packets_in_2
+  PacketsInView packets_in_3
+  PacketsInView packets_in_4
+  PacketsInView packets_in_5
+  PacketsInView packets_in_6
+  PacketsInView packets_in_7
+  PacketsInView packets_in_8
+  PacketsOutView packets_out
+  ReceivedLLDPPacketsView lldps
+  RegisteredHostsView hosts
+End Views
+
+# Describe event-view relation
+Events
+  SwitchJoinEvent by switches
+  SwitchLeaveEvent by switches
+  PacketInEvent by packets_in_1
+  LLDPPacketInEvent by lldps
+End Events
+
+# Define all DAGs to run in the system
+DAGs
+Begin DAG 1
+  Node a Activation
+  	Input JoinedSwitchesView switches
+  	Input ReceivedLLDPPacketsView lldps
+  End Node
+  Node n1 DiscoveryApp
+  	Input JoinedSwitchesView switches
+  	Input ReceivedLLDPPacketsView lldps
+  	Input ConnectivityLocalView conn_local
+  	Output JoinedSwitchesView switches
+  	Output ConnectivityLocalView conn_local
+  End Node
+  Node n2 IntraRoutingApp
+  	Input ConnectivityLocalView conn_local
+  	Input RoutingIntraView routing_intra
+  	Output RoutingIntraView routing_intra
+  End Node
+  Node t Terminal
+  	Output JoinedSwitchesView switches
+  	Output ConnectivityLocalView conn_local
+  	Output RoutingIntraView routing_intra
+  End Node
+  Edge a->n1
+  Edge n1->n2
+  Edge n2->t
+End DAG 1
+
+Begin DAG 2
+  RedundantWaiting
+  Node a Activation
+  	Input PacketsInView packets_in_1
+  End Node
+  Node n1 LocationManagementApp
+    Input PacketsInView packets_in_1
+  	Input JoinedSwitchesView switches
+  	Input RegisteredHostsView hosts
+  	Output FlowsInView flows_in
+  	Output RegisteredHostsView hosts
+  End Node
+  Node n2 RouteFlowApp
+    Input JoinedSwitchesView switches
+    Input RoutingIntraView routing_intra
+    Input FlowsInView flows_in
+    Output FlowConfigView flow_config
+    Output PacketsOutView packets_out
+  End Node
+  Node t Terminal
+    Output FlowConfigView flow_config
+    Output RegisteredHostsView hosts
+    Output PacketsOutView packets_out
+  End Node
+  Edge a->n1
+  Edge n1->n2
+  Edge n2->t
+End DAG 2
+
+Begin DAG 3
+  RedundantWaiting
+  Node a Activation
+  	Input PacketsInView packets_in_2
+  End Node
+  Node n1 LocationManagementApp
+    Input PacketsInView packets_in_2
+  	Input JoinedSwitchesView switches
+  	Input RegisteredHostsView hosts
+  	Output FlowsInView flows_in
+  	Output RegisteredHostsView hosts
+  End Node
+  Node n2 RouteFlowApp
+    Input JoinedSwitchesView switches
+    Input RoutingIntraView routing_intra
+    Input FlowsInView flows_in
+    Output FlowConfigView flow_config
+    Output PacketsOutView packets_out
+  End Node
+  Node t Terminal
+    Output FlowConfigView flow_config
+    Output RegisteredHostsView hosts
+    Output PacketsOutView packets_out
+  End Node
+  Edge a->n1
+  Edge n1->n2
+  Edge n2->t
+End DAG 3
+
+Begin DAG 4
+  RedundantWaiting
+  Node a Activation
+  	Input PacketsInView packets_in_3
+  End Node
+  Node n1 LocationManagementApp
+    Input PacketsInView packets_in_3
+  	Input JoinedSwitchesView switches
+  	Input RegisteredHostsView hosts
+  	Output FlowsInView flows_in
+  	Output RegisteredHostsView hosts
+  End Node
+  Node n2 RouteFlowApp
+    Input JoinedSwitchesView switches
+    Input RoutingIntraView routing_intra
+    Input FlowsInView flows_in
+    Output FlowConfigView flow_config
+    Output PacketsOutView packets_out
+  End Node
+  Node t Terminal
+    Output FlowConfigView flow_config
+    Output RegisteredHostsView hosts
+    Output PacketsOutView packets_out
+  End Node
+  Edge a->n1
+  Edge n1->n2
+  Edge n2->t
+End DAG 4
+
+Begin DAG 5
+  RedundantWaiting
+  Node a Activation
+  	Input PacketsInView packets_in_4
+  End Node
+  Node n1 LocationManagementApp
+    Input PacketsInView packets_in_4
+  	Input JoinedSwitchesView switches
+  	Input RegisteredHostsView hosts
+  	Output FlowsInView flows_in
+  	Output RegisteredHostsView hosts
+  End Node
+  Node n2 RouteFlowApp
+    Input JoinedSwitchesView switches
+    Input RoutingIntraView routing_intra
+    Input FlowsInView flows_in
+    Output FlowConfigView flow_config
+    Output PacketsOutView packets_out
+  End Node
+  Node t Terminal
+    Output FlowConfigView flow_config
+    Output RegisteredHostsView hosts
+    Output PacketsOutView packets_out
+  End Node
+  Edge a->n1
+  Edge n1->n2
+  Edge n2->t
+End DAG 5
+
+Begin DAG 6
+  RedundantWaiting
+  Node a Activation
+  	Input PacketsInView packets_in_5
+  End Node
+  Node n1 LocationManagementApp
+    Input PacketsInView packets_in_5
+  	Input JoinedSwitchesView switches
+  	Input RegisteredHostsView hosts
+  	Output FlowsInView flows_in
+  	Output RegisteredHostsView hosts
+  End Node
+  Node n2 RouteFlowApp
+    Input JoinedSwitchesView switches
+    Input RoutingIntraView routing_intra
+    Input FlowsInView flows_in
+    Output FlowConfigView flow_config
+    Output PacketsOutView packets_out
+  End Node
+  Node t Terminal
+    Output FlowConfigView flow_config
+    Output RegisteredHostsView hosts
+    Output PacketsOutView packets_out
+  End Node
+  Edge a->n1
+  Edge n1->n2
+  Edge n2->t
+End DAG 6
+
+Begin DAG 7
+  RedundantWaiting
+  Node a Activation
+  	Input PacketsInView packets_in_6
+  End Node
+  Node n1 LocationManagementApp
+    Input PacketsInView packets_in_6
+  	Input JoinedSwitchesView switches
+  	Input RegisteredHostsView hosts
+  	Output FlowsInView flows_in
+  	Output RegisteredHostsView hosts
+  End Node
+  Node n2 RouteFlowApp
+    Input JoinedSwitchesView switches
+    Input RoutingIntraView routing_intra
+    Input FlowsInView flows_in
+    Output FlowConfigView flow_config
+    Output PacketsOutView packets_out
+  End Node
+  Node t Terminal
+    Output FlowConfigView flow_config
+    Output RegisteredHostsView hosts
+    Output PacketsOutView packets_out
+  End Node
+  Edge a->n1
+  Edge n1->n2
+  Edge n2->t
+End DAG 7
+
+Begin DAG 8
+  RedundantWaiting
+  Node a Activation
+  	Input PacketsInView packets_in_7
+  End Node
+  Node n1 LocationManagementApp
+    Input PacketsInView packets_in_7
+  	Input JoinedSwitchesView switches
+  	Input RegisteredHostsView hosts
+  	Output FlowsInView flows_in
+  	Output RegisteredHostsView hosts
+  End Node
+  Node n2 RouteFlowApp
+    Input JoinedSwitchesView switches
+    Input RoutingIntraView routing_intra
+    Input FlowsInView flows_in
+    Output FlowConfigView flow_config
+    Output PacketsOutView packets_out
+  End Node
+  Node t Terminal
+    Output FlowConfigView flow_config
+    Output RegisteredHostsView hosts
+    Output PacketsOutView packets_out
+  End Node
+  Edge a->n1
+  Edge n1->n2
+  Edge n2->t
+End DAG 8
+
+Begin DAG 9
+  RedundantWaiting
+  Node a Activation
+  	Input PacketsInView packets_in_8
+  End Node
+  Node n1 LocationManagementApp
+    Input PacketsInView packets_in_8
+  	Input JoinedSwitchesView switches
+  	Input RegisteredHostsView hosts
+  	Output FlowsInView flows_in
+  	Output RegisteredHostsView hosts
+  End Node
+  Node n2 RouteFlowApp
+    Input JoinedSwitchesView switches
+    Input RoutingIntraView routing_intra
+    Input FlowsInView flows_in
+    Output FlowConfigView flow_config
+    Output PacketsOutView packets_out
+  End Node
+  Node t Terminal
+    Output FlowConfigView flow_config
+    Output RegisteredHostsView hosts
+    Output PacketsOutView packets_out
+  End Node
+  Edge a->n1
+  Edge n1->n2
+  Edge n2->t
+End DAG 9
+
+DAGs
+Begin DAG 10
+  Node a Activation
+    Timer 2000
+  End Node
+  Node n1 ProbeApp
+    Input JoinedSwitchesView switches
+    Output PacketsOutView packets_out
+  End Node
+  Node t Terminal
+    Output PacketsOutView packets_out
+  End Node
+  Edge a->n1
+  Edge n1->t
+End DAG 10
+  
+End DAGs
