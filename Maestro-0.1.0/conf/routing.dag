@@ -12,7 +12,7 @@ Views
   RegisteredHostsView hosts
 End Views
 
-# Describe event-view relation
+# Describe event-view registrations
 Events
   SwitchJoinEvent by switches
   SwitchLeaveEvent by switches
@@ -24,25 +24,25 @@ End Events
 DAGs
 Begin DAG 1
   Node a Activation
-  	Input JoinedSwitchesView switches
-  	Input ReceivedLLDPPacketsView lldps
+    Input JoinedSwitchesView switches
+    Input ReceivedLLDPPacketsView lldps
   End Node
   Node n1 DiscoveryApp
-  	Input JoinedSwitchesView switches
-  	Input ReceivedLLDPPacketsView lldps
-  	Input ConnectivityLocalView conn_local
-  	Output JoinedSwitchesView switches
-  	Output ConnectivityLocalView conn_local
+    Input JoinedSwitchesView switches
+    Input ReceivedLLDPPacketsView lldps
+    Input ConnectivityLocalView conn_local
+    Output JoinedSwitchesView switches
+    Output ConnectivityLocalView conn_local
   End Node
   Node n2 IntraRoutingApp
-  	Input ConnectivityLocalView conn_local
-  	Input RoutingIntraView routing_intra
-  	Output RoutingIntraView routing_intra
+    Input ConnectivityLocalView conn_local
+    Input RoutingIntraView routing_intra
+    Output RoutingIntraView routing_intra
   End Node
   Node t Terminal
-  	Output JoinedSwitchesView switches
-  	Output ConnectivityLocalView conn_local
-  	Output RoutingIntraView routing_intra
+    Output JoinedSwitchesView switches
+    Output ConnectivityLocalView conn_local
+    Output RoutingIntraView routing_intra
   End Node
   Edge a->n1
   Edge n1->n2
@@ -52,14 +52,14 @@ End DAG 1
 Begin DAG 2
   RedundantWaiting
   Node a Activation
-  	Input PacketsInView packets_in_1
+    Input PacketsInView packets_in_1
   End Node
   Node n1 LocationManagementApp
     Input PacketsInView packets_in_1
-  	Input JoinedSwitchesView switches
-  	Input RegisteredHostsView hosts
-  	Output FlowsInView flows_in
-  	Output RegisteredHostsView hosts
+    Input JoinedSwitchesView switches
+    Input RegisteredHostsView hosts
+    Output FlowsInView flows_in
+    Output RegisteredHostsView hosts
   End Node
   Node n2 RouteFlowApp
     Input JoinedSwitchesView switches
@@ -78,7 +78,6 @@ Begin DAG 2
   Edge n2->t
 End DAG 2
 
-DAGs
 Begin DAG 3
   Node a Activation
     Timer 2000

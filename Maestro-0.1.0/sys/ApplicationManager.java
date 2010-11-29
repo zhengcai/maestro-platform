@@ -313,8 +313,7 @@ public class ApplicationManager extends Thread {
 				}
 				continue;
 			    }
-			    if (words[0]
-				.compareToIgnoreCase("RedundantWaiting") == 0) {
+			    if (words[0].compareToIgnoreCase("RedundantWaiting") == 0) {
 				currentDAG.redundantWaiting = true;
 				continue;
 			    }
