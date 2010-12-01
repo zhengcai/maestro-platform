@@ -68,6 +68,13 @@ public class CmdConsole extends Thread {
 			printOptions();
 		    }
 		    if (s.compareTo("1") == 0) {
+			viewManager.printAllViews();
+			System.out.println();
+			for (DAG dag : appManager.dags.values()) {
+			    dag.print();
+			    System.out.println();
+			}
+			/*
 			System.err.println("t1 = "+Parameters.t1/1000000);
 			System.err.println("t2 = "+Parameters.t2/1000000);
 			System.err.println("t3 = "+Parameters.t3/1000000);
@@ -80,6 +87,7 @@ public class CmdConsole extends Thread {
 			System.err.println("c2 = "+Parameters.c2);
 			System.err.println("c3 = "+Parameters.c3);
 			viewManager.driver.print();
+			*/
 		    }
 		    if (s.compareTo("quit") == 0) {
 			Utilities.closeLogFile();

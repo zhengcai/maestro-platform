@@ -81,7 +81,7 @@ public class IntraRoutingApp extends App {
                 if (index >= n) {
 		    conn.releaseRead();
 		    result.addView(0, rt);
-		    Utilities.printlnDebug("Quit the intro-domain routing computation because index is out of bound");
+		    //Utilities.printlnDebug("Quit the intro-domain routing computation because index is out of bound");
                     return result;
                 }
                 idMap[index] = l.A;
@@ -92,7 +92,7 @@ public class IntraRoutingApp extends App {
                 if (index >= n) {
 		    conn.releaseRead();
 		    result.addView(0, rt);
-		    Utilities.printlnDebug("Quit the intro-domain routing computation because index is out of bound");
+		    //Utilities.printlnDebug("Quit the intro-domain routing computation because index is out of bound");
                     return result;
                 }
                 idMap[index] = l.B;
@@ -144,7 +144,7 @@ public class IntraRoutingApp extends App {
                     if (l == null ) {
                     	rt.releaseWrite();
                     	result.addView(0, rt);
-			Utilities.printlnDebug("Quit the intro-domain routing computation because we find a null link");
+			//Utilities.printlnDebug("Quit the intro-domain routing computation because we find a null link");
                     	return result;
                     }
                     RoutingIntraView.Route route = new RoutingIntraView.Route(

@@ -4,7 +4,7 @@ Bundle openflow
 # Declare all view instances that will be in the global environment
 Views
   JoinedSwitchesView switches
-  PacketsInView packets_in_1
+  PacketsInView packets_in
   LearnedMACsView macs
 End Views
 
@@ -12,18 +12,18 @@ End Views
 Events
   SwitchJoinEvent by switches
   SwitchLeaveEvent by switches
-  PacketInEvent by packets_in_1
+  PacketInEvent by packets_in
 End Events
 
 # Define all DAGs to run in the system
 DAGs
-Begin DAG 1
+Begin DAG
   RedundantWaiting
   Node a Activation
-    Input PacketsInView packets_in_1
+    Input PacketsInView packets_in
   End Node
   Node n1 LearningSwitchesApp
-    Input PacketsInView packets_in_1
+    Input PacketsInView packets_in
     Input JoinedSwitchesView switches
     Input LearnedMACsView macs
     Output FlowConfigView flow_config
@@ -37,5 +37,5 @@ Begin DAG 1
   End Node
   Edge a->n1
   Edge n1->t
-End DAG 1
+End DAG
 End DAGs

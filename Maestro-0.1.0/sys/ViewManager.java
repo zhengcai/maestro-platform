@@ -56,6 +56,15 @@ public class ViewManager {
     	Utilities.Assert(view.whetherInterested(event), "View "+viewName+" is not interested in "+event.getClass().getSimpleName());
     	eventToView.put(event.getClass().getSimpleName(), viewName);
     }
+
+    public void registerEventConcurrent(Event event, String viewName) {
+	for (int i=0;i<Parameters.divide;i++) {
+	    View view = global.getView(viewName+"_"+i);
+	    Utilities.Assert(view != null, "View "+viewName+"_"+i+" does not exist!");
+	    Utilities.Assert(view.whetherInterested(event), "View "+viewName+"_"+i+" is not interested in "+event.getClass().getSimpleName());
+	}
+	eventToView.put(event.getClass().getSimpleName(), viewName);
+    }
     
     /** Start running the driver in the main thread */
     public void startDriver(String name) {
@@ -78,6 +87,18 @@ public class ViewManager {
      */
     public View getViewInstance(String instName) {
     	return global.getView(instName);
+    }
+
+    public void printAllViews() {
+	for (String s : global.getViewNames()) {
+	    View v = global.getView(s);
+	    System.out.println("Class "
+			       + v.getClass().getSimpleName()
+			       + ", Name "
+			       + s
+			       + ", Pointer"
+			       + v);
+	}
     }
     
     /**
@@ -103,6 +124,25 @@ public class ViewManager {
 	    trigger.add(viewName);
 	    am.triggerDag(global, trigger);
     	}
+    }
+
+    public void postEventConcurrent(Event e, int which) {
+	String viewName = eventToView.get(e.getClass().getSimpleName());
+	if (viewName == null) {
+	    return;
+	}
+
+	//. TODO: currently trigger the DAG for each event, no batching yet
+	View v = global.getView(viewName+"_"+which);
+	if (v == null) {
+	    return;
+	}
+
+	if (v.processEvent(e)) {
+	    HashSet<String> trigger = new HashSet<String>();
+	    trigger.add(viewName+"_"+which);
+	    am.triggerDag(global, trigger);
+	}
     }
     
     /**

@@ -26,7 +26,6 @@ import java.util.*;
  * 
  */
 public class ActivationNode extends AppInstanceNode {
-	
     /** views which will trigger the activation event of this DAG */
     Set<String> viewNames;
 
@@ -34,8 +33,8 @@ public class ActivationNode extends AppInstanceNode {
     Timer timer;
 	
     /** Create a new instance of ActivationNode */
-    public ActivationNode(DAG d) {
-	super(null, d);
+    public ActivationNode(String n, DAG d) {
+	super(n, null, d);
 	viewNames = new HashSet<String>();
     }
 }

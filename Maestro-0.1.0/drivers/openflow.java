@@ -479,10 +479,10 @@ public class openflow extends Driver {
 	    }
 	} else {
 	    if (Parameters.divide > 0) {
-		int toWhich = Parameters.am.taskMgr.getCurrentWorkerID() + 1;
+		int toWhich = Parameters.am.taskMgr.getCurrentWorkerID();
 		vm.postEventToSpecificView(pi, "packets_in_"+toWhich);
 	    } else {
-		vm.postEventToSpecificView(pi, "packets_in_1");
+		vm.postEventToSpecificView(pi, "packets_in");
 	    }
 	}
     }

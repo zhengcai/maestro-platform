@@ -6,7 +6,7 @@ Views
   JoinedSwitchesView switches
   ConnectivityLocalView conn_local
   RoutingIntraView routing_intra
-  PacketsInView packets_in_1
+  PacketsInView packets_in Concurrent
   PacketsOutView packets_out
   ReceivedLLDPPacketsView lldps
   RegisteredHostsView hosts
@@ -16,13 +16,13 @@ End Views
 Events
   SwitchJoinEvent by switches
   SwitchLeaveEvent by switches
-  PacketInEvent by packets_in_1
+  PacketInEvent by packets_in
   LLDPPacketInEvent by lldps
 End Events
 
 # Define all DAGs to run in the system
 DAGs
-Begin DAG 1
+Begin DAG
   Node a Activation
     Input JoinedSwitchesView switches
     Input ReceivedLLDPPacketsView lldps
@@ -47,15 +47,15 @@ Begin DAG 1
   Edge a->n1
   Edge n1->n2
   Edge n2->t
-End DAG 1
+End DAG
 
-Begin DAG 2
-  RedundantWaiting
+Begin DAG
+  Concurrent
   Node a Activation
-    Input PacketsInView packets_in_1
+    Input PacketsInView packets_in
   End Node
   Node n1 LocationManagementApp
-    Input PacketsInView packets_in_1
+    Input PacketsInView packets_in
     Input JoinedSwitchesView switches
     Input RegisteredHostsView hosts
     Output FlowsInView flows_in
@@ -76,9 +76,9 @@ Begin DAG 2
   Edge a->n1
   Edge n1->n2
   Edge n2->t
-End DAG 2
+End DAG
 
-Begin DAG 3
+Begin DAG
   Node a Activation
     Timer 2000
   End Node
@@ -91,6 +91,6 @@ Begin DAG 3
   End Node
   Edge a->n1
   Edge n1->t
-End DAG 3
+End DAG
   
 End DAGs

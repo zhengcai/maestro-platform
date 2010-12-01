@@ -57,6 +57,9 @@ public class ApplicationManager extends Thread {
     /** Triggered but wait to run runtime DAGs */
     public LinkedList<DAGRuntime> triggered;
 
+    /** View instance names that are marked as concurrent */
+    HashSet<String> concurrentNames;
+
     /** Thread pool */
     public TaskManager taskMgr;
 
@@ -75,10 +78,11 @@ public class ApplicationManager extends Thread {
 	console = new CmdConsole(this, vm);
 	configFile = conf;
 	dags = new HashMap<Integer, DAG>();
-	running = new HashMap<Integer, DAGRuntime>();
+	running = new HashMap<Integer, DAGRuntime>();	
 	triggered = new LinkedList<DAGRuntime>();
 	synchro = new Semaphore(1);
 	triggerMap = new HashMap<String, LinkedList<DAG>>();
+	concurrentNames = new HashSet<String>();
 	if (Parameters.divide > 0) {
 	    taskMgr = new TaskManager(Parameters.divide);
 	}
@@ -124,7 +128,9 @@ public class ApplicationManager extends Thread {
 	    //. DAGs
 	    int section = 0;
 	    DAG currentDAG = null;
-	    int currentDAGid = 0;
+
+	    //. Start DAG ID from 1
+	    int currentDAGid = 1;
 	    String line = null;
 	    while ((line = input.readLine()) != null) {
 		line = Utilities.TrimConfigString(line);
@@ -139,8 +145,18 @@ public class ApplicationManager extends Thread {
 			break;
 		    }
 		    Class viewClass = Class.forName("views."
-						    + Parameters.bundle + "." + words[0]);
-		    vm.global.addView(words[1], (View) viewClass.newInstance());
+						    + Parameters.bundle + "." + words[0]);		    
+		    if (3 == words.length &&
+			words[2].compareToIgnoreCase("Concurrent") == 0 &&
+			Parameters.divide > 0) {
+			for (int i=0;i<Parameters.divide;i++) {
+			    View v = (View) viewClass.newInstance();
+			    vm.global.addView(words[1]+"_"+i, v);
+			    concurrentNames.add(words[1]);
+			}
+		    } else {
+			vm.global.addView(words[1], (View) viewClass.newInstance());
+		    }
 		    break;
 		case 3: // For Events
 		    if (line.compareToIgnoreCase("End Events") == 0) {
@@ -152,13 +168,17 @@ public class ApplicationManager extends Thread {
 						     + Parameters.bundle + "." + words[0]);
 		    Utilities.Assert(words[1].compareToIgnoreCase("by") == 0,
 				     "Second word in Events section needs to be by!");
-		    vm.registerEvent((Event)eventClass.newInstance(), words[2]);
+		    if (concurrentNames.contains(words[2])) {
+			vm.registerEventConcurrent((Event)eventClass.newInstance(), words[2]);
+		    } else {
+			vm.registerEvent((Event)eventClass.newInstance(), words[2]);
+		    }
 		    break;
 		case 4: // For DAGs
 		    if (words[0].compareToIgnoreCase("Begin") == 0) {
-			Utilities.Assert((words.length == 3),
-					 "Parsing error: Expected-- Begin DAG id");
-			currentDAGid = Integer.parseInt(words[2]);
+			Utilities.Assert((words.length == 2),
+					 "Parsing error: Expected-- Begin DAG");
+			//currentDAGid = Integer.parseInt(words[2]);
 			currentDAG = new DAG(currentDAGid, vm);
 			while ((line = input.readLine()) != null) {
 			    line = Utilities.TrimConfigString(line);
@@ -171,7 +191,7 @@ public class ApplicationManager extends Thread {
 				    .Assert((words.length == 3),
 					    "Parsing error: Expected -- Node name app");
 				if (words[2].compareToIgnoreCase("Activation") == 0) {
-				    currentDAG.activation = new ActivationNode(currentDAG);
+				    currentDAG.activation = new ActivationNode(words[1], currentDAG);
 				    currentDAG.nodes.put(words[1],
 							 currentDAG.activation);
 				    while ((line = input.readLine()) != null) {
@@ -208,7 +228,7 @@ public class ApplicationManager extends Thread {
 					}
 				    }
 				} else if (words[2].compareToIgnoreCase("Terminal") == 0) {
-				    currentDAG.terminal = new TerminalNode(currentDAG);
+				    currentDAG.terminal = new TerminalNode(words[1], currentDAG);
 				    currentDAG.nodes.put(words[1],
 							 currentDAG.terminal);
 				    int inputPos = 0, outputPos = 0;
@@ -249,7 +269,7 @@ public class ApplicationManager extends Thread {
 				    Class appClass = Class.forName("apps."
 								   + Parameters.bundle + "."
 								   + words[2]);
-				    AppInstanceNode node = new AppInstanceNode(
+				    AppInstanceNode node = new AppInstanceNode(words[1],
 									       (App) appClass.newInstance(),
 									       currentDAG);
 				    node.app.initiate(vm, this);
@@ -304,7 +324,7 @@ public class ApplicationManager extends Thread {
 
 				    AppInstanceEdge e = new AppInstanceEdge(to);
 				    to.inDegree++;
-				    from.edges.addFirst(e);
+				    from.edges.addLast(e);
 
 				    /*
 				     * if (to instanceof TerminalNode) {
@@ -313,13 +333,25 @@ public class ApplicationManager extends Thread {
 				}
 				continue;
 			    }
-			    if (words[0].compareToIgnoreCase("RedundantWaiting") == 0) {
-				currentDAG.redundantWaiting = true;
+			    if (words[0].compareToIgnoreCase("Concurrent") == 0) {
+				currentDAG.concurrent = true;
 				continue;
 			    }
 			    if (words[0].compareToIgnoreCase("End") == 0) {
-				dags.put(new Integer(currentDAGid), currentDAG);
-				currentDAGid = 0;
+				if (currentDAG.concurrent && Parameters.divide > 0) {
+				    for (int i=0;i<Parameters.divide;i++) {
+					HashMap<String, String> replace = new HashMap<String, String>();
+					for (String s : concurrentNames) {
+					    replace.put(s, s+"_"+i);
+					}
+					DAG newDag = currentDAG.cloneWithViewNameReplacing(replace, currentDAGid);
+					dags.put(new Integer(newDag.id), newDag);
+					currentDAGid ++;
+				    }
+				} else {
+				    dags.put(new Integer(currentDAG.id), currentDAG);
+				    currentDAGid ++;
+				}
 				currentDAG = null;
 				break;
 			    }
@@ -383,9 +415,7 @@ public class ApplicationManager extends Thread {
      * priority scheme, or round-robin like scheme
      */
     public void updateTriggerMap() {
-	Iterator<DAG> it = dags.values().iterator();
-	while (it.hasNext()) {
-	    DAG d = it.next();
+	for (DAG d : dags.values()) {
 	    for (String i : d.activation.viewNames) {
 		LinkedList<DAG> list = triggerMap.get(i);
 		if (list == null) {
@@ -401,7 +431,7 @@ public class ApplicationManager extends Thread {
      *  Start a particular DAG. Usually this is a DAG triggered by a timer event
      */
     public void startDag(Environment env, DAG dag) {
-	if (dag.redundantWaiting) {
+	if (dag.concurrent) {
 	    DAGRuntime drun = new DAGRuntime(dag, env, vm,
 					     getNextInstanceID());
 	    
@@ -464,7 +494,7 @@ public class ApplicationManager extends Thread {
 	//. DAGRuntime, and put it in the queue.
 	for (DAG dag : dags) {
 	    //. TODO: Only work for non-cloning version
-	    if (dag.redundantWaiting) {
+	    if (dag.concurrent) {
 		DAGRuntime drun = new DAGRuntime(dag, env, vm,
 						 getNextInstanceID());
 
@@ -701,7 +731,7 @@ public class ApplicationManager extends Thread {
      * @return true if there is potential conflict, otherwise false
      */
     public boolean checkConflict(DAG dag) {
-	if (dag.redundantWaiting)
+	if (dag.concurrent)
 	    return false;
 	long before = 0;
 	if (Parameters.measurePerf) {

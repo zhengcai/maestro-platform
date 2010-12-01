@@ -41,6 +41,9 @@ public abstract class View implements Serializable {
      */
     public Semaphore sem;
 
+    /** Whether multiple view instances should be created and accessed by concurrent DAGs */
+    boolean concurrent = false;
+
     public void acquireRead() {
 	/*try {
 	  sem.acquire();
