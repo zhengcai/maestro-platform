@@ -24,6 +24,7 @@ import views.View;
 import events.*;
 import events.openflow.SwitchJoinEvent;
 import events.openflow.SwitchLeaveEvent;
+import sys.Utilities;
 
 public class JoinedSwitchesView extends View {
     /** All switches that exist in the network */
@@ -75,8 +76,16 @@ public class JoinedSwitchesView extends View {
     }
 	
     private boolean handleSwitchLeaveEvent(SwitchLeaveEvent sl) {
-	// TODO: Incomplete implementation
-	return false;
+	acquireWrite();
+	SwitchJoinEvent sj = all.get(sl.dpid);
+	if (null == sj) {
+	    Utilities.printlnDebug("Cannot find a switch with dpid "+sl.dpid);
+	    return false;
+	}
+	removed.put(sj.dpid, sj);
+	all.remove(sl.dpid);
+	releaseWrite();
+	return true;
     }
 
     @Override
@@ -84,5 +93,9 @@ public class JoinedSwitchesView extends View {
 	for (SwitchJoinEvent e : all.values()) {
 	    System.out.println(e);
 	}
+    }
+
+    public SwitchJoinEvent getSwitch(long dpid) {
+	return all.get(dpid);
     }
 }

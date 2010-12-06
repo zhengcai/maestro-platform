@@ -121,8 +121,11 @@ public class EthernetHeader extends Header {
 	default:
 	    break;
 	}
-
-	return inner.parseHeader(buf, pos);
+	
+	if (null != inner)
+	    return inner.parseHeader(buf, pos);
+	else
+	    return pos;
     }
 
     public String toString() {

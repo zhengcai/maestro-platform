@@ -130,11 +130,12 @@ public class PacketInEvent extends MemoryPoolEvent {
     public long dpid;
     public long xid;
     public long bufferId;
-    public int totalLen;	// Length of data
+    public int totalLen;	//. Length of data
     public int inPort;
     public short reason;
     public DataPayload data;
     public FlowInfo flow;
+    public EthernetHeader header; //. Assume all packets are ethernet frames
 
     public PacketInEvent() {
 	super(-1);
@@ -148,9 +149,12 @@ public class PacketInEvent extends MemoryPoolEvent {
 
     /**
      * Extract the FlowInfo from a ethernet frame, currently only accepts ethernet frame
+     * Also remember the header, if going to be used later in applications
      * @param eth the ethernet frame header
      */
     public void extractFlowInfo(EthernetHeader eth) {
+	header = eth;
+	
 	flow.inPort = inPort;
 	
 	Header current = eth;

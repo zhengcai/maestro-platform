@@ -40,17 +40,15 @@ public class Main {
 		if (words.length == 0) continue;
 	    
 		if (words[0].compareToIgnoreCase("verbose") == 0) {
-		    Parameters.localDebug = (1 == Integer.parseInt(words[1]))?true:false;
+		    Parameters.printDebug = (1 == Integer.parseInt(words[1]))?true:false;
 		} else if (words[0].compareToIgnoreCase("batchInputNum") == 0) {
 		    Parameters.batchInputNum = Integer.parseInt(words[1]);
 		} else if (words[0].compareToIgnoreCase("batchOutput") == 0) {
 		    Parameters.batchOutput = (1 == Integer.parseInt(words[1]))?true:false;
-		} else if (words[0].compareToIgnoreCase("divide") == 0) {
+		} else if (words[0].compareToIgnoreCase("numThreads") == 0) {
 		    Parameters.divide = Integer.parseInt(words[1]);
 		    Utilities.Assert(Parameters.divide <= Constants.MAXIMUM_DIVIDE, 
-				     "Divide exceeds MAXIMUM_DIVIDE which is "+Constants.MAXIMUM_DIVIDE);
-		} else if (words[0].compareToIgnoreCase("maxWaitingDAGIns") == 0) {
-		    Parameters.maxWaitingDAGIns = Integer.parseInt(words[1]);
+				     "numThreads exceeds the maximum value allowed which is "+Constants.MAXIMUM_DIVIDE);
 		} else if (words[0].compareToIgnoreCase("threadBind") == 0) {
 		    Parameters.threadBind = Integer.parseInt(words[1]);
 		} else if (words[0].compareToIgnoreCase("countDone") == 0) {
@@ -79,13 +77,14 @@ public class Main {
      * @param args the command line arguments
      */
     public static void main(String[] args) throws Exception {
-	if (args.length != 2) {
-	    System.err.println("Usage: parameter-configuration-file dag-file");
+	if (args.length != 3) {
+	    System.err.println("Usage: parameter-configuration-file dag-file runConsole");
 	    System.exit(0);
 	}
     	Thread.currentThread().setName("Main thread");
     	readConfiguration(args[0]);
     	ApplicationManager am = new ApplicationManager(args[1]);
+	Parameters.runConsole = (1 == Integer.parseInt(args[2]))?true:false;
     	Parameters.am = am;
     	am.run();
     }

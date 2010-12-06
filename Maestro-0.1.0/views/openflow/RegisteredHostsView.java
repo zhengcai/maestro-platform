@@ -53,6 +53,10 @@ public class RegisteredHostsView extends View {
 	return hosts.put(Utilities.GetLongFromMAC(mac), l);
     }
 
+    public Location removeHostLocation(short[] mac) {
+	return hosts.remove(Utilities.GetLongFromMAC(mac));
+    }
+
     @Override
 	public void commit(Driver driver) {
 		

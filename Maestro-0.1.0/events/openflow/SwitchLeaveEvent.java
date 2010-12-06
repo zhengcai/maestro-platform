@@ -20,6 +20,8 @@ package events.openflow;
 import events.Event;
 
 public class SwitchLeaveEvent extends Event {
+    public long dpid;
+    
     @Override
 	public int convertToBytes(byte[] buf, int index) {
 	return 0;

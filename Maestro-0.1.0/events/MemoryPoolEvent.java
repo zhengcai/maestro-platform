@@ -23,11 +23,11 @@ package events;
  * @author Zheng Cai
  */
 abstract public class MemoryPoolEvent extends Event {
-	public int poolIdx;
-	public boolean valid;
-	
-	public MemoryPoolEvent(int idx) {
-		poolIdx = idx;
-		valid = false;
-	}
+    public int poolIdx;
+    public boolean valid;
+    
+    public MemoryPoolEvent(int idx) {
+	poolIdx = idx;
+	valid = false;
+    }
 }

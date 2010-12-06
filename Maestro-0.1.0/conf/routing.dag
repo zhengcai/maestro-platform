@@ -1,5 +1,5 @@
 # Which set of applications, events, views and driver should Maestro load?
-Bundle openflow
+Package openflow
 
 # Declare all view instances that will be in the global environment
 Views

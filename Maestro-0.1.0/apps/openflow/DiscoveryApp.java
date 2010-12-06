@@ -45,11 +45,7 @@ public class DiscoveryApp extends App {
 	JoinedSwitchesView sws = (JoinedSwitchesView)input.getView(0);
 	ReceivedLLDPPacketsView lldps = (ReceivedLLDPPacketsView)input.getView(1);
 	ConnectivityLocalView conn = (ConnectivityLocalView)input.getView(2);
-	
-	sws.acquireWrite();
-	//. TODO: handle the switches specified in the sws.removed
-	sws.releaseWrite();
-		
+			
 	//. Process LLDP packets to construct the ConnectivityLocalView
 	lldps.acquireWrite();
 	conn.acquireWrite();
@@ -64,6 +60,22 @@ public class DiscoveryApp extends App {
 	conn.releaseWrite();
 	lldps.lldps.clear();
 	lldps.releaseWrite();
+
+	//. Handle the switches specified in the sws.removed
+	//. Delete all obselete links which involve the removed switch
+	if (sws.removed.size() > 0) {
+	    conn.acquireWrite();
+	    for (ConnectivityLocalView.Link link : conn.getAllLinks()) {
+		if (null != sws.removed.get(link.A) || null != sws.removed.get(link.B)) {
+		    conn.removeLink(link);
+		}
+	    }
+	    conn.releaseWrite();
+	}
+	sws.acquireWrite();
+	sws.removed.clear();
+	sws.releaseWrite();
+
 		
 	ViewsIOBucket output = new ViewsIOBucket();
 	output.addView(0, sws);

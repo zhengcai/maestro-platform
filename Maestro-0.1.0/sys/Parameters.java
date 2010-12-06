@@ -107,7 +107,7 @@ public class Parameters {
 	
     public static ApplicationManager am = null;
     
-    public static int maxWaitingDAGIns = 10;
+    public static int maxWaitingDAGIns = 20;
     
     public static boolean useMemoryMgnt = false;
     public static boolean warmuped = false;
@@ -123,4 +123,6 @@ public class Parameters {
     public static long running = 0;
 
     public static int listenPort = 0;
+
+    public static boolean runConsole = true;
 }

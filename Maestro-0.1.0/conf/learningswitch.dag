@@ -1,5 +1,5 @@
 # Which set of applications, events, views and driver should Maestro load?
-Bundle openflow
+Package openflow
 
 # Declare all view instances that will be in the global environment
 Views
@@ -18,7 +18,6 @@ End Events
 # Define all DAGs to run in the system
 DAGs
 Begin DAG
-  RedundantWaiting
   Node a Activation
     Input PacketsInView packets_in
   End Node
@@ -32,8 +31,8 @@ Begin DAG
   End Node
   Node t Terminal
     Output FlowConfigView flow_config
-    Output LearnedMACsView macs
     Output PacketsOutView packets_out
+    Output LearnedMACsView macs
   End Node
   Edge a->n1
   Edge n1->t

@@ -111,7 +111,8 @@ public class ApplicationManager extends Thread {
     public void run() {
 	loadSystem();
 	updateTriggerMap();
-	console.start();
+	if (Parameters.runConsole)
+	    console.start();
 	vm.startDriver(Parameters.bundle);
     }
 
@@ -364,9 +365,9 @@ public class ApplicationManager extends Thread {
 
 		if (0 == section) {
 		    //. Enter the bundles section
-		    if (words[0].compareToIgnoreCase("Bundle") == 0) {
+		    if (words[0].compareToIgnoreCase("Package") == 0) {
 			Utilities.Assert(words.length >= 2,
-					 "Have to specify the bundle name!");
+					 "Have to specify the package name!");
 			Parameters.bundle = words[1];
 			continue;
 		    }
