@@ -42,6 +42,7 @@ import sys.Parameters;
 import sys.Utilities;
 import drivers.OFPConstants;
 import headers.EthernetHeader;
+import headers.LLDPHeader;
 
 public class openflow extends Driver {
     Random random;
@@ -464,10 +465,21 @@ public class openflow extends Driver {
 
 	if (OFPConstants.OfpConstants.ETH_TYPE_LLDP == pi.flow.dlType) {
 	    LLDPPacketInEvent lldp = new LLDPPacketInEvent();
+	    /*
 	    lldp.srcDpid = Utilities.GetLongFromBytesInt(pi.data.data,
 							 OFPConstants.OfpConstants.OFP_ETH_ALEN*2 + 2);
 	    lldp.srcPort = Utilities.GetIntFromBytesInt(pi.data.data,
 							OFPConstants.OfpConstants.OFP_ETH_ALEN*2 + 2 + Long.SIZE/8);
+	    */
+	    if(!(eth.inner instanceof LLDPHeader)) {
+		Utilities.printlnDebug("The LLDP packet is not correctly formated");
+		return;
+	    }
+	    LLDPHeader lldpHeader = (LLDPHeader)eth.inner;
+	    lldp.srcDpid = Utilities.getNetworkBytesUint64(lldpHeader.chassisId.value, 0);
+	    lldp.srcPort = Utilities.getNetworkBytesUint16(lldpHeader.portId.value, 0);
+	    lldp.ttl = Utilities.getNetworkBytesUint16(lldpHeader.ttl.value, 0);
+	    
 	    lldp.dstDpid =pi.dpid;
 	    lldp.dstPort = pi.inPort;
 	    if (sw.dpid == 0) {

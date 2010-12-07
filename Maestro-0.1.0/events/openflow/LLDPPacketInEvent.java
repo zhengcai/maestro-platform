@@ -18,8 +18,9 @@
 package events.openflow;
 
 public class LLDPPacketInEvent extends PacketInEvent {
-	public long srcDpid;
-	public long dstDpid;
-	public int srcPort;
-	public int dstPort;
+    public long srcDpid;
+    public long dstDpid;
+    public int srcPort;
+    public int dstPort;
+    public int ttl;
 }

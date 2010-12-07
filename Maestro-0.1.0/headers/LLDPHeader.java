@@ -86,6 +86,17 @@ public class LLDPHeader extends Header {
 	    
 	    return pos;
 	}
+
+	public int convertToBytes(byte[] buf, int pos) {
+	    int typeLength = length;
+	    typeLength += (type << 9);
+	    pos += Utilities.setNetworkBytesUint16(buf, pos, typeLength);
+	    
+	    for (int i = 0; i < length; i++)
+		buf[pos++] = value[i];
+	    
+	    return pos;
+	}
     }
     /*
       5   - System name
@@ -105,7 +116,8 @@ public class LLDPHeader extends Header {
     public static final int TLV_TYPE_SYSTEM_CAPA = 7;
     public static final int TLV_TYPE_MGNT_ADDR = 8;
     public static final int TLV_TYPE_ORG_SPECIFIC = 127;
-    
+    public static final int TLV_TYPE_END = 0;
+    public static final int TLV_LENGTH_END = 0;
 
     /** Members */
     /** Chassis ID */
@@ -142,8 +154,6 @@ public class LLDPHeader extends Header {
      * @return The position in the buffer after parsing the header
      */
     public int parseHeader(byte[] buf, int pos) {
-	//. Currently since Maestro is not using standard LLDP format yet, don't parse
-	/*
 	pos = chassisId.parseTLV(buf, pos);
 	Utilities.AssertWithoutExit(TLV_TYPE_CHASSIS_ID == chassisId.type, "LLDPDU Chassis ID type is wrong as "+chassisId.type);
 	
@@ -161,7 +171,6 @@ public class LLDPHeader extends Header {
 	}
 	//. Move the pos ahead by 2, because we read a 0-0 type_length
 	pos += 2;
-	*/
 
 	return pos;
     }

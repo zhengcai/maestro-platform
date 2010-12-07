@@ -24,12 +24,15 @@ import sys.Parameters;
 import views.ViewsIOBucket;
 import views.openflow.*;
 import apps.App;
+import headers.LLDPHeader;
 
 /**
  * ProbeApp periodically send out LLDP packets on ports of all switches
  * To help the DiscoveryApp discover links in the network
  */
 public class ProbeApp extends App {
+    public static final int DEFAULT_TTL = 255;
+    
     @Override
 	public ViewsIOBucket process(ViewsIOBucket input) {
 	//. Assume view at pos 0 is JoinedSwitchesView, 
@@ -70,8 +73,8 @@ public class ProbeApp extends App {
 	ret.actions[0] = PacketOutEvent.makeOutputAction(port.portNo);
 	ret.actionsLen = ret.actions[0].len;
 		
-	//. The data section contains: [dstMAC(6) srcMAC(6) ethType(2) dpid(8) portNo(4)]
-	ret.dataLen = OFPConstants.OfpConstants.OFP_ETH_ALEN*2 + 2 + Long.SIZE/8 + Integer.SIZE/8;
+	//. The data section contains: [dstMAC(6) srcMAC(6) ethType(2) chassisId(2+long) portId(2+unsigned short) ttl(2+unsigned short) end(2)]
+	ret.dataLen = OFPConstants.OfpConstants.OFP_ETH_ALEN*2 + 2 + 2 + Long.SIZE/8 + 2 + Short.SIZE/8 + 2 + Short.SIZE/8 + 2;
 	//ret.data = new byte[ret.dataLen];
 	ret.data = new PacketInEvent.DataPayload(ret.dataLen);
 	int index = 0;
@@ -89,10 +92,35 @@ public class ProbeApp extends App {
 	//. Reverse the byte order to achieve htons effect, for ETH_TYPE_LLDP
 	ret.data.data[index++] = OFPConstants.OfpConstants.ETH_TYPE_LLDP_B1;
 	ret.data.data[index++] = OFPConstants.OfpConstants.ETH_TYPE_LLDP_B0;
-		
+
+	/*
 	Utilities.setBytesLong(ret.data.data, index, sw.dpid);
 	index += Long.SIZE/8;
 	Utilities.setBytesInt(ret.data.data, index, port.portNo);
+	*/
+	LLDPHeader.TLV tlv = new LLDPHeader.TLV();
+	tlv.type = LLDPHeader.TLV_TYPE_CHASSIS_ID;
+	tlv.length = Long.SIZE/8;
+	tlv.value = new byte[Long.SIZE/8];
+	Utilities.setNetworkBytesUint64(tlv.value, 0, sw.dpid);
+	index = tlv.convertToBytes(ret.data.data, index);
+
+	tlv.type = LLDPHeader.TLV_TYPE_PORT_ID;
+	tlv.length = Short.SIZE/8;
+	tlv.value = new byte[Short.SIZE/8];
+	Utilities.setNetworkBytesUint16(tlv.value, 0, port.portNo);
+	index = tlv.convertToBytes(ret.data.data, index);
+
+	tlv.type = LLDPHeader.TLV_TYPE_TTL;
+	tlv.length = Short.SIZE/8;
+	tlv.value = new byte[Short.SIZE/8];
+	Utilities.setNetworkBytesUint16(tlv.value, 0, DEFAULT_TTL);
+	index = tlv.convertToBytes(ret.data.data, index);
+
+	tlv.type = LLDPHeader.TLV_TYPE_END;
+	tlv.length = LLDPHeader.TLV_LENGTH_END;
+	index = tlv.convertToBytes(ret.data.data, index);
+
 	return ret;
     }
 }
