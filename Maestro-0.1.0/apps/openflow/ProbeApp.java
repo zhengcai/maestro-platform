@@ -1,18 +1,21 @@
 /*
-  Copyright (C) 2010 Zheng Cai
-  
-  Maestro is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-  
-  Maestro is distributed in the hope that it will be useful,
+  ProbeApp.java
+
+  Copyright (C) 2010  Rice University
+
+  This software is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+
+  This software is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-  
-  You should have received a copy of the GNU General Public License
-  along with Maestro.  If not, see <http://www.gnu.org/licenses/>.
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public
+  License along with this software; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 package apps.openflow;
@@ -29,6 +32,7 @@ import headers.LLDPHeader;
 /**
  * ProbeApp periodically send out LLDP packets on ports of all switches
  * To help the DiscoveryApp discover links in the network
+ * @author Zheng Cai
  */
 public class ProbeApp extends App {
     public static final int DEFAULT_TTL = 255;
@@ -39,7 +43,7 @@ public class ProbeApp extends App {
 	JoinedSwitchesView sws = (JoinedSwitchesView)input.getView(0);
 	PacketsOutView pkts = new PacketsOutView();
 	
-	// Send out LLDP packets for all switches
+	//. Send out LLDP packets for all switches
 	sws.acquireWrite();
 	for (SwitchJoinEvent i : sws.all.values()) {
 	    for (SwitchJoinEvent.PhysicalPort p : i.ports) {
@@ -63,8 +67,8 @@ public class ProbeApp extends App {
      * @return the constructed LLDP packet (contained in a PacketOutEvent)
      */
     private PacketOutEvent constructLLDPPacket(SwitchJoinEvent sw, SwitchJoinEvent.PhysicalPort port) {
-	// TODO: Currently not compatible to standard LLDP, nor to NOX
-	// right now just a temporary simplified implementation for Maestro
+	//. TODO: Currently not compatible to standard LLDP, nor to NOX
+	//. right now just a temporary simplified implementation for Maestro
 	PacketOutEvent ret = new PacketOutEvent();
 	ret.dpid = sw.dpid;
 	ret.bufferId = OFPConstants.OP_UNBUFFERED_BUFFER_ID;

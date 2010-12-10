@@ -1,18 +1,21 @@
 /*
-  Copyright (C) 2010 Zheng Cai
+  IntraRoutingApp.java
 
-  Maestro is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
+  Copyright (C) 2010  Rice University
 
-  Maestro is distributed in the hope that it will be useful,
+  This software is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+
+  This software is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
 
-  You should have received a copy of the GNU General Public License
-  along with Maestro.  If not, see <http://www.gnu.org/licenses/>.
+  You should have received a copy of the GNU Lesser General Public
+  License along with this software; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 package apps.openflow;
@@ -33,6 +36,7 @@ import sys.Utilities;
  * for all destinations in the network, based on the connectivity map.
  * It uses the Floyd-Warshall algorithm. In the future, we plan to
  * introduce the incremental shortest-path routing algorithm
+ * @author Zheng Cai
  */
 public class IntraRoutingApp extends App {
     @Override
@@ -63,7 +67,7 @@ public class IntraRoutingApp extends App {
                 else {
                     adjacency[i][j] = ConnectivityLocalView.linkCostMax;
                 }
-                //. Warning: if the dpid of the switch is unluckily -1, then we are screwed
+                //. Warning: if the dpid of the switch is unluckily -1, then bad things happen
                 nextHop[i][j] = -1;
             }
         }
@@ -81,7 +85,6 @@ public class IntraRoutingApp extends App {
                 if (index >= n) {
 		    conn.releaseRead();
 		    result.addView(0, rt);
-		    //Utilities.printlnDebug("Quit the intro-domain routing computation because index is out of bound");
                     return result;
                 }
                 idMap[index] = l.A;
@@ -92,7 +95,6 @@ public class IntraRoutingApp extends App {
                 if (index >= n) {
 		    conn.releaseRead();
 		    result.addView(0, rt);
-		    //Utilities.printlnDebug("Quit the intro-domain routing computation because index is out of bound");
                     return result;
                 }
                 idMap[index] = l.B;
@@ -144,11 +146,10 @@ public class IntraRoutingApp extends App {
                     if (l == null ) {
                     	rt.releaseWrite();
                     	result.addView(0, rt);
-			//Utilities.printlnDebug("Quit the intro-domain routing computation because we find a null link");
                     	return result;
                     }
-                    RoutingIntraView.Route route = new RoutingIntraView.Route(
-									      l.portA, nextHop[i][j], l.portB, adjacency[i][j]);
+                    RoutingIntraView.Route route =
+			new RoutingIntraView.Route(l.portA, nextHop[i][j], l.portB, adjacency[i][j]);
                     rt.addNextHop(from, to, route);
                 }
             }

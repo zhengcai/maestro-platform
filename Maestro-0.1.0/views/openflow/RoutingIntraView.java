@@ -1,18 +1,21 @@
 /*
-  Copyright (C) 2010 Zheng Cai
+  RoutingIntraView.java
 
-  Maestro is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
+  Copyright (C) 2010  Rice University
 
-  Maestro is distributed in the hope that it will be useful,
+  This software is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+
+  This software is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
 
-  You should have received a copy of the GNU General Public License
-  along with Maestro.  If not, see <http://www.gnu.org/licenses/>.
+  You should have received a copy of the GNU Lesser General Public
+  License along with this software; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 package views.openflow;
@@ -23,6 +26,10 @@ import drivers.Driver;
 import views.View;
 import events.Event;
 
+/**
+ * Contains the all pair shortest path routing table for all switches
+ * @author Zheng Cai
+ */
 public class RoutingIntraView extends View {
     public static class Route {
 	/** Port of this hop connected to the next hop */
@@ -90,16 +97,6 @@ public class RoutingIntraView extends View {
 	return ret;
     }
 	
-    public void printAll() {
-	for (long A : routes.keySet()) {
-	    for (long B : routes.get(A).keySet()) {
-		Route r = routes.get(A).get(B);
-		System.out.println(String.format("Route %d->%d: next=%d, port=%d, nextPort=%d, cost=%d",
-						 A, B, r.next, r.port, r.nextPort, r.cost));
-	    }
-	}
-    }
-
     @Override
 	public void commit(Driver driver) {
 
@@ -112,12 +109,17 @@ public class RoutingIntraView extends View {
 
     @Override
 	public boolean whetherInterested(Event e) {
-	// Not interested in any event
 	return false;
     }
 
     @Override
 	public void print() {
-
+	for (long A : routes.keySet()) {
+	    for (long B : routes.get(A).keySet()) {
+		Route r = routes.get(A).get(B);
+		System.out.println(String.format("Route %d->%d: next=%d, port=%d, nextPort=%d, cost=%d",
+						 A, B, r.next, r.port, r.nextPort, r.cost));
+	    }
+	}
     }
 }

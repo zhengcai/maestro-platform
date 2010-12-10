@@ -1,18 +1,21 @@
 /*
-  Copyright (C) 2010 Zheng Cai
-  
-  Maestro is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-  
-  Maestro is distributed in the hope that it will be useful,
+  openflow.java
+
+  Copyright (C) 2010  Rice University
+
+  This software is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+
+  This software is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-  
-  You should have received a copy of the GNU General Public License
-  along with Maestro.  If not, see <http://www.gnu.org/licenses/>.
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public
+  License along with this software; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 package drivers;
@@ -44,6 +47,10 @@ import drivers.OFPConstants;
 import headers.EthernetHeader;
 import headers.LLDPHeader;
 
+/**
+ * The driver for OpenFlow switches
+ * @author Zheng Cai
+ */
 public class openflow extends Driver {
     Random random;
     public class MyInteger {
@@ -322,23 +329,19 @@ public class openflow extends Driver {
 	int length = Utilities.getNetworkBytesUint16(buffer, pos+2);
 	switch(type) {
 	case OFPConstants.PacketTypes.OFPT_HELLO:
-	    //System.err.println("Switch "+sw.dpid+" received hello");
 	    sendFeatureRequest(sw);
-	    //System.err.println("Switch "+sw.dpid+" sent feature request");
 	    break;
 	case OFPConstants.PacketTypes.OFPT_ECHO_REQUEST:
 	    Utilities.setNetworkBytesUint8(buffer, pos+1, OFPConstants.PacketTypes.OFPT_ECHO_REPLY);	    
 	    ByteBuffer buf = ByteBuffer.allocate(length);
 	    if (size != length) {
-		System.err.println("BAD! In handling echo_request: size != length");
+		Utilities.printlnDebug("BAD! In handling echo_request: size != length");
 	    } else {
 		buf.put(buffer, pos, length);
 	    }
 	    sw.send(buf);
-	    //System.err.println("Sending back an echo_reply with size = "+length);
 	    break;
 	case OFPConstants.PacketTypes.OFPT_FEATURES_REPLY:
-	    //System.err.println(Thread.currentThread().getId()+" -> Switch "+sw.dpid+" received feature reply");
 	    handleFeaturesReply(sw, buffer, pos, length);
 	    break;
 	case OFPConstants.PacketTypes.OFPT_PACKET_IN:
@@ -465,12 +468,6 @@ public class openflow extends Driver {
 
 	if (OFPConstants.OfpConstants.ETH_TYPE_LLDP == pi.flow.dlType) {
 	    LLDPPacketInEvent lldp = new LLDPPacketInEvent();
-	    /*
-	    lldp.srcDpid = Utilities.GetLongFromBytesInt(pi.data.data,
-							 OFPConstants.OfpConstants.OFP_ETH_ALEN*2 + 2);
-	    lldp.srcPort = Utilities.GetIntFromBytesInt(pi.data.data,
-							OFPConstants.OfpConstants.OFP_ETH_ALEN*2 + 2 + Long.SIZE/8);
-	    */
 	    if(!(eth.inner instanceof LLDPHeader)) {
 		Utilities.printlnDebug("The LLDP packet is not correctly formated");
 		return;
@@ -697,7 +694,7 @@ public class openflow extends Driver {
 	  if (pp != null) {
 	  pp.es.addAll(pt.es);
 	  pp.totalLength += pt.totalLength;
-	  // We can consolidate this partition to an existing one
+	  //. We can consolidate this partition to an existing one
 	  toRun = false;
 	  pt.es.clear();
 	  }
