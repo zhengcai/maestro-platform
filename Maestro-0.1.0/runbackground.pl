@@ -1,4 +1,5 @@
 #!/usr/bin/perl -w
+# The script to run Maestro in background, binding threads to cores
 
 my $javapath = $ENV{'JAVA_HOME'} or die "Please configure JAVA_HOME to the right jdk directory";
 my $configfile = $ARGV[0] or die "Run with: parameter-configuration-file dag-file";
