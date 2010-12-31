@@ -68,20 +68,24 @@ public class ViewManager {
 	}
 	eventToView.put(event.getClass().getSimpleName(), viewName);
     }
+
+    /** Load the driver class */
+    public void loadDriver(String bundle) {
+	try {
+	    driver = (Driver)Class.forName("drivers."+bundle).newInstance();
+	} catch (InstantiationException e) {
+	    Utilities.Assert(false, "driver-"+bundle+" initialization fault");
+	} catch (IllegalAccessException e) {
+	    Utilities.Assert(false, "driver-"+bundle+" illegal access exception");
+	} catch (ClassNotFoundException e) {
+	    Utilities.Assert(false, "driver-"+bundle+" class not found");
+	}
+	
+	driver.vm = this;
+    }
     
     /** Start running the driver in the main thread */
-    public void startDriver(String name) {
-    	try {
-	    driver = (Driver)Class.forName("drivers."+name).newInstance();
-	} catch (InstantiationException e) {
-	    Utilities.Assert(false, "driver-"+name+" initialization fault");
-	} catch (IllegalAccessException e) {
-	    Utilities.Assert(false, "driver-"+name+" illegal access exception");
-	} catch (ClassNotFoundException e) {
-	    Utilities.Assert(false, "driver-"+name+" class not found");
-	}
-		
-	driver.vm = this;
+    public void startDriver() {
 	driver.start();
     }
     

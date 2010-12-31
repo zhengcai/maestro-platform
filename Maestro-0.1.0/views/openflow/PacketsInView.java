@@ -59,9 +59,9 @@ public class PacketsInView extends View {
 
 	synchronized(incoming) {
 	    incoming.addLast((PacketInEvent)e);
-	    int queueSize = Parameters.am.taskMgr.getQueueSize();
+	    //int queueSize = Parameters.am.taskMgr.getQueueSize();
 		
-	    if (incoming.size() >= Parameters.batchInputNum || queueSize <= 5) {
+	    if (incoming.size() >= Parameters.batchInputNum/* || queueSize <= 5*/) {
 		synchronized (queues) {
 		    LinkedList<PacketInEvent> toAdd = new LinkedList<PacketInEvent>();
 		    toAdd.addAll(incoming);

@@ -176,7 +176,8 @@ public class DAGRuntime {
     	if (Parameters.divide == 0) {
 	    n.run();
     	} else {
-	    am.enqueueBindingTask(n, Constants.PRIORITY_MEDIUM);
+	    //am.enqueueBindingTask(n, Constants.PRIORITY_MEDIUM);
+	    n.run();
     	}
     }
     

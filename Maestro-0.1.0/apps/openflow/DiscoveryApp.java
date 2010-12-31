@@ -54,10 +54,10 @@ public class DiscoveryApp extends App {
 	lldps.acquireWrite();
 	conn.acquireWrite();
 	for (LLDPPacketInEvent lldp : lldps.lldps) {
-	    
+	    /*
 	    Utilities.printlnDebug(String.format("Updating link %d(%d)-->%d(%d)", 
 						 lldp.srcDpid, lldp.srcPort, lldp.dstDpid, lldp.dstPort));
-	    
+	    */
 	    conn.addLink(new ConnectivityLocalView.Link(lldp.srcDpid, lldp.srcPort, lldp.dstDpid, lldp.dstPort));
 	}
 

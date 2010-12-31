@@ -103,7 +103,8 @@ public abstract class Driver {
 	abstract public void print();
 
         /**
-	 * Notify that one of the worker threads is idling
+	 * Let the driver return a new Runnable task,
+	 * for each worker thread to work on
 	 */
-        //abstract public void workerIdling();
+        abstract public Runnable newTask();
 }

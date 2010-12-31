@@ -16,7 +16,7 @@ my @ls = <CONF>;
 foreach my $l (@ls) {
     chomp($l);
     my @words = split(/ /, $l);
-    if ($words[0] =~ /divide/) {
+    if ($words[0] =~ /numThreads/) {
 	$threadsnum = $words[1];
 	last;
     }

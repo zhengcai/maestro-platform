@@ -30,6 +30,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.Set;
 
@@ -53,31 +54,9 @@ import headers.LLDPHeader;
  */
 public class openflow extends Driver {
     Random random;
-    public class MyInteger {
-	int value;
-		
-	public MyInteger(int v) {
-	    value = v;
-	}
-    }
-    public MyInteger pendingTasks = new MyInteger(0);
-    public void evaluateAndResume() {
-	synchronized(pendingTasks) {
-	    pendingTasks.value --;
-
-	    //. Otherwise the suspend created by the ApplicatinonManager will be suppressed by this resmue
-	    if (pendingTasks.value <= Parameters.queueUpperBound /*&& Parameters.am.running.size() < Parameters.maxWaitingDAGIns*/) {
-		resume();
-	    }
-	    /*
-	      if (0 == pendingTasks.value) {
-	      Parameters.pipeDrained ++;
-	      }
-	    */
-	}
-    }
 	
     private static class Switch {
+	/*
     	public class WorkerThread implements Runnable {
 	    openflow of;
 	    Switch sw;
@@ -98,19 +77,21 @@ public class openflow extends Driver {
 			    sw.running.value = false;
 			} else {
 			    WorkerThread r = sw.workQueue.removeFirst();
-			    Parameters.am.enqueueTask(r, Constants.PRIORITY_LOW);
+			    //Parameters.am.enqueueTask(r, Constants.PRIORITY_LOW);
 			}
 		    }
 		}
 	    }
     	}
+	*/
     	
 	public long dpid = 0;
 	public SocketChannel channel = null;
 	public int bufferSize = 0;
 	public byte[] buffer = new byte[BUFFERSIZE];
-	public LinkedList<WorkerThread> workQueue;
-		
+	//public LinkedList<WorkerThread> workQueue;
+
+	/*
 	class MyBoolean {
 	    public boolean value;
 			
@@ -119,27 +100,31 @@ public class openflow extends Driver {
 	    }
 	}
 	private MyBoolean running = new MyBoolean(false);
+	*/
+	public boolean chopping = false;
 		
 	/** For those lldps received before the dpid of this switch is known */
 	private LinkedList<LLDPPacketInEvent> lldpQueue;
 		
 	public Switch() {
-	    workQueue = new LinkedList<WorkerThread>();
+	    //workQueue = new LinkedList<WorkerThread>();
 	    lldpQueue = new LinkedList<LLDPPacketInEvent>();
 	}
-		
+
+	/*
 	public void enqueueTask(openflow o, ByteBuffer b, int si) {
 	    synchronized(workQueue) {
 		synchronized(running) {
 		    if (workQueue.size() == 0 && !running.value) {
 			running.value = true;
-			Parameters.am.enqueueTask(new WorkerThread(o, this, b, si), Constants.PRIORITY_LOW);
+			//Parameters.am.enqueueTask(new WorkerThread(o, this, b, si), Constants.PRIORITY_LOW);
 		    } else {
 			workQueue.addLast(new WorkerThread(o, this, b, si));
 		    }
 		}
 	    }
 	}
+	*/
 
 	synchronized public int send(ByteBuffer pkt) {
 	    int ret = 0;
@@ -158,13 +143,67 @@ public class openflow extends Driver {
 	    return ret;
 	}
     }
+
+    /**
+     * Switch socket round-robin pool implementation
+     */
+    private static class SwitchRRPool {
+	private ArrayList<Switch> pool = null;
+	private int currentPos = 0;
+
+	public SwitchRRPool() {
+	    pool = new ArrayList<Switch>();
+	}
+
+	public void addSwitch(Switch sw) {
+	    synchronized(pool) {
+		pool.add(sw);
+	    }
+	}
+
+	public void removeSwitch(Switch sw) {
+	    synchronized(pool) {
+		int idx = pool.indexOf(sw);
+		if (-1 != idx)
+		    pool.remove(idx);
+	    }
+	}
+
+	public Switch nextSwitch() {
+	    synchronized(pool) {
+		int size = pool.size();
+		if (0 == size) {
+		    return null;
+		}
+		for (int i = 0; i < size; i++) {
+		    Switch sw = pool.get(currentPos);
+		    currentPos = (currentPos+1)%size;
+		    if (!sw.chopping) {
+			sw.chopping = true;
+			return sw;
+		    }
+		}
+
+		//. All busy chopping
+		return null;
+	    }
+	}
+    }
 	
     private final static int BUFFERSIZE = 4096;
 	
     private HashMap<Long, Switch> dpid2switch;
     private HashMap<SocketChannel, Switch> chnl2switch;
     private Selector s;
+    private SwitchRRPool swRRPool;
 	
+    public openflow() {
+    	random = new Random();
+    	dpid2switch = new HashMap<Long, Switch>();
+    	chnl2switch = new HashMap<SocketChannel, Switch>();
+	swRRPool = new SwitchRRPool();
+    }
+    
     public int SendPktOut(long dpid, ByteBuffer pkt, int length) {
 	long before = 0;
 	if (Parameters.measurePerf) {
@@ -181,13 +220,9 @@ public class openflow extends Driver {
 	}
 	return ret;
     }
-    
-    int pkts = 1;
-    long cycles = 0;
-    public openflow() {
-    	random = new Random();
-    	dpid2switch = new HashMap<Long, Switch>();
-    	chnl2switch = new HashMap<SocketChannel, Switch>();
+
+    public SwitchRRPool getRRPool() {
+	return swRRPool;
     }
     
     public void start() {
@@ -210,12 +245,15 @@ public class openflow extends Driver {
 			if (k.isAcceptable()) {
 			    SocketChannel channel = ((ServerSocketChannel)k.channel()).accept();
 			    channel.configureBlocking(false);
-			    SelectionKey clientKey = channel.register(s, SelectionKey.OP_READ);
+			    //SelectionKey clientKey = channel.register(s, SelectionKey.OP_READ);
 			    Switch sw = new Switch();
 			    sw.channel = channel;
 			    chnl2switch.put(channel, sw);
+			    swRRPool.addSwitch(sw);
 			    sendHelloMessage(sw);
-			} else if (k.isReadable()) {
+			}
+			/*
+			else if (k.isReadable()) {
 			    Switch sw = chnl2switch.get((SocketChannel)k.channel());
 			    Utilities.Assert(sw.channel == k.channel(), "Channels do not match!");
 			    ByteBuffer buffer = ByteBuffer.allocate(BUFFERSIZE);
@@ -243,6 +281,7 @@ public class openflow extends Driver {
 			    }
 							
 			}
+			*/
 		    } catch (IOException e) {
 			e.printStackTrace();
 			k.channel().close();
@@ -257,23 +296,38 @@ public class openflow extends Driver {
 	}
     }
 
-    /** Handle one raw message */
-    public void handleMessage(Switch sw, SocketChannel channel, ByteBuffer buffer, int size) {
+    private static class RawMessage {
+	public byte[] buf;
+	public int start;
+	public int length;
+
+	public RawMessage(byte[] b, int s, int l) {
+	    buf = b;
+	    start = s;
+	    length = l;
+	}
+    }
+
+    /** Chop raw messages from a buffer, leaving half-done bytes in the switch's buffer */
+    public ArrayList<RawMessage> chopMessages(Switch sw, ByteBuffer buffer, int size) {
 	byte[] buf = buffer.array();
+	ArrayList<RawMessage> ret = new ArrayList<RawMessage>();
 	int bufPos = 0;
 	if (sw.bufferSize >= OFPConstants.OfpConstants.OFP_HEADER_LEN) {
 	    int length = Utilities.getNetworkBytesUint16(sw.buffer, 2);
 	    
 	    if ((length - sw.bufferSize) <= size) {
-		Utilities.memcpy(sw.buffer, sw.bufferSize, buf, bufPos, length-sw.bufferSize);                 
+		byte[] b = new byte[length];
+		Utilities.memcpy(b, 0, sw.buffer, 0, sw.bufferSize);
+		Utilities.memcpy(b, sw.bufferSize, buf, bufPos, length-sw.bufferSize);                 
 		size -= (length-sw.bufferSize);                                              
 		bufPos += (length-sw.bufferSize);                                               
-		dispatchPacket(sw, sw.buffer, 0, length);                                 
+		ret.add(new RawMessage(b, 0, length));
 		sw.bufferSize = 0;                                                           
 	    } else {                                                                        
 		Utilities.memcpy(sw.buffer, sw.bufferSize, buf, bufPos, size);                                  
 		sw.bufferSize += size;
-		return;
+		return ret;
 	    }                                                                               
 	} else if (sw.bufferSize > 0) {                                                  
 	    if ((sw.bufferSize + size) >= OFPConstants.OfpConstants.OFP_HEADER_LEN) {                     
@@ -285,22 +339,24 @@ public class openflow extends Driver {
     		
 		int length = Utilities.getNetworkBytesUint16(sw.buffer, 2);
     		
-		if ((length - sw.bufferSize) <= size) {                                      
-		    Utilities.memcpy(sw.buffer, sw.bufferSize, buf, bufPos, length-sw.bufferSize);               
-		    size -= (length-sw.bufferSize);                                            
-		    bufPos += (length-sw.bufferSize);                                             
-		    dispatchPacket(sw, sw.buffer, 0, length);                               
+		if ((length - sw.bufferSize) <= size) {
+		    byte[] b = new byte[length];
+		    Utilities.memcpy(b, 0, sw.buffer, 0, sw.bufferSize);
+		    Utilities.memcpy(b, sw.bufferSize, buf, bufPos, length-sw.bufferSize);                 
+		    size -= (length-sw.bufferSize);                                              
+		    bufPos += (length-sw.bufferSize);                                               
+		    ret.add(new RawMessage(b, 0, length));
 		    sw.bufferSize = 0;
 		} else {                                                                      
 		    Utilities.memcpy(sw.buffer, sw.bufferSize, buf, bufPos, size);                                
 		    sw.bufferSize += size;
-		    return;                                                                     
+		    return ret;                                                                     
 		}                                                                             
 	    } else {                                                                        
 		//. Still not enough for holding ofp_header                                    
 		Utilities.memcpy(sw.buffer, sw.bufferSize, buf, bufPos, size);                                  
 		sw.bufferSize += size;
-		return;                                                                       
+		return ret;
 	    }                                                                               
 	}
     	
@@ -317,10 +373,13 @@ public class openflow extends Driver {
 		sw.bufferSize = size;                                                        
 		break;                                                                        
 	    }
-	    dispatchPacket(sw, buf, bufPos, length);
+
+	    //. buffer is not going to be shared among worker threads, so no need to copy
+	    ret.add(new RawMessage(buf, bufPos, length));
 	    size -= length;                                                                 
 	    bufPos += length;                                                                  
 	}
+	return ret;
     }
     
     public void dispatchPacket(Switch sw, byte[] buffer, int pos, int size) {
@@ -329,9 +388,11 @@ public class openflow extends Driver {
 	int length = Utilities.getNetworkBytesUint16(buffer, pos+2);
 	switch(type) {
 	case OFPConstants.PacketTypes.OFPT_HELLO:
+	    //Utilities.printlnDebug("Got hello");
 	    sendFeatureRequest(sw);
 	    break;
 	case OFPConstants.PacketTypes.OFPT_ECHO_REQUEST:
+	    //Utilities.printlnDebug("Got echo");
 	    Utilities.setNetworkBytesUint8(buffer, pos+1, OFPConstants.PacketTypes.OFPT_ECHO_REPLY);	    
 	    ByteBuffer buf = ByteBuffer.allocate(length);
 	    if (size != length) {
@@ -342,6 +403,7 @@ public class openflow extends Driver {
 	    sw.send(buf);
 	    break;
 	case OFPConstants.PacketTypes.OFPT_FEATURES_REPLY:
+	    //Utilities.printlnDebug("Got features_reply");
 	    handleFeaturesReply(sw, buffer, pos, length);
 	    break;
 	case OFPConstants.PacketTypes.OFPT_PACKET_IN:
@@ -488,7 +550,7 @@ public class openflow extends Driver {
 	    }
 	} else {
 	    if (Parameters.divide > 0) {
-		int toWhich = Parameters.am.taskMgr.getCurrentWorkerID();
+		int toWhich = Parameters.am.workerMgr.getCurrentWorkerID();
 		vm.postEventConcurrent(pi, toWhich);
 	    } else {
 		vm.postEvent(pi);
@@ -599,10 +661,11 @@ public class openflow extends Driver {
 	
     private boolean processToSpecificSwitchEvent(LinkedList<Event> events) {
 
-	class WorkerThread implements Runnable {
+	class OutputWork implements Runnable {
 	    openflow of;
 	    Partition pt = null;
-	    public WorkerThread(openflow o) {
+	    
+	    public OutputWork(openflow o) {
 		of = o;
 	    }
 	    public void run() {
@@ -667,7 +730,8 @@ public class openflow extends Driver {
 	    pt.totalLength += tsse.getLength();
 	}
 	pt.es = events;
-		
+
+	/*
 	if (Parameters.divide == 0) {
 	    if (Parameters.batchOutput) {
 		ByteBuffer pkt = pt.toPacket();
@@ -682,6 +746,7 @@ public class openflow extends Driver {
 	    }
 	    return true;
 	}
+	*/
 		
 	boolean toRun = true;
 	
@@ -701,8 +766,8 @@ public class openflow extends Driver {
 	  }
 	*/
 	if (toRun) {
-	    WorkerThread worker = new WorkerThread(this);
-	    worker.pt = pt;
+	    OutputWork work = new OutputWork(this);
+	    work.pt = pt;
 	    /* For better paralizability of memory management,
 	     * we do not do partition consolidation
 	     */
@@ -711,7 +776,8 @@ public class openflow extends Driver {
 	      pendingPts.put(pt.dpid, pt);
 	      }
 	    */
-	    Parameters.am.enqueueBindingTask(worker, Constants.PRIORITY_HIGH);
+	    //Parameters.am.enqueueBindingTask(worker, Constants.PRIORITY_HIGH);
+	    work.run();
 	}
 
 	if (Parameters.measurePerf) {
@@ -722,5 +788,59 @@ public class openflow extends Driver {
 	
     public void print() {
 	
-    }    
+    }
+
+    public static class OpenFlowTask implements Runnable {
+	private openflow of;
+
+	public OpenFlowTask(openflow o) {
+	    of = o;
+	}
+
+	public void run() {
+	    ByteBuffer buffer = ByteBuffer.allocate(BUFFERSIZE);
+	    while (true) {
+		Switch sw = of.getRRPool().nextSwitch();
+		if (null == sw)
+		    continue;		
+		
+		try {
+		    buffer.clear();
+		    int size = sw.channel.read(buffer);
+		    if (size == -1) {
+			sw.chopping = false;
+			handleLeftSwitch(sw);
+			continue;
+		    } else if (size == 0) {
+			sw.chopping = false;
+			continue;
+		    }
+
+		    ArrayList<RawMessage> msgs = of.chopMessages(sw, buffer, size);
+		    sw.chopping = false;
+
+		    for (RawMessage msg : msgs) {
+			of.dispatchPacket(sw, msg.buf, msg.start, msg.length);
+		    }
+		} catch (IOException e) {
+		    e.printStackTrace();
+		    handleLeftSwitch(sw);
+		}
+	    }
+	}
+
+	public void handleLeftSwitch(Switch sw) {
+	    try {
+		sw.channel.close();
+	    } catch (IOException e) {
+		Utilities.printlnDebug("Switch "+sw.dpid+" has left the network");
+	    }
+	    of.getRRPool().removeSwitch(sw);
+	    //. TODO: Generate a switch leave event
+	}
+    }
+    
+    public Runnable newTask() {
+	return new OpenFlowTask(this);
+    }
 }

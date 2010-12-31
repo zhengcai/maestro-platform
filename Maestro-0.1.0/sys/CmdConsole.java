@@ -72,12 +72,7 @@ public class CmdConsole extends Thread {
 			printOptions();
 		    }
 		    if (s.compareTo("1") == 0) {
-			viewManager.printAllViews();
-			System.out.println();
-			for (DAG dag : appManager.dags.values()) {
-			    dag.print();
-			    System.out.println();
-			}
+			viewManager.driver.print();
 			/*
 			System.err.println("t1 = "+Parameters.t1/1000000);
 			System.err.println("t2 = "+Parameters.t2/1000000);

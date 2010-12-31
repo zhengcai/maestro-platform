@@ -63,8 +63,8 @@ public class ApplicationManager extends Thread {
     /** View instance names that are marked as concurrent */
     HashSet<String> concurrentNames;
 
-    /** Thread pool */
-    public TaskManager taskMgr;
+    /** Worker thread manager */
+    public WorkerManager workerMgr;
 
     /** Memory manager */
     public MemoryManager memMgr;
@@ -86,14 +86,25 @@ public class ApplicationManager extends Thread {
 	synchro = new Semaphore(1);
 	triggerMap = new HashMap<String, LinkedList<DAG>>();
 	concurrentNames = new HashSet<String>();
+	/*
 	if (Parameters.divide > 0) {
 	    taskMgr = new TaskManager(Parameters.divide);
 	}
+	*/
+	loadSystem();
+	vm.loadDriver(Parameters.bundle);
+	workerMgr = new WorkerManager();
+	System.err.println("# workers is "+Parameters.divide);
+	for (int i = 0; i < Parameters.divide; i++) {
+	    workerMgr.addThread(vm.driver.newTask());
+	}
+
 	if (Parameters.useMemoryMgnt) {
 	    memMgr = new MemoryManager();
 	}
     }
 
+    /*
     public void enqueueTask(Runnable r, int priority) {
 	taskMgr.execute(r, priority);
     }
@@ -104,6 +115,7 @@ public class ApplicationManager extends Thread {
 	else
 	    taskMgr.execute(r, priority);
     }
+    */
     
     /**
      * Start the ApplicationManager, and it will start the whole system TODO So
@@ -112,11 +124,10 @@ public class ApplicationManager extends Thread {
      * should probably think about adding this feature later.
      */
     public void run() {
-	loadSystem();
 	updateTriggerMap();
 	if (Parameters.runConsole)
 	    console.start();
-	vm.startDriver(Parameters.bundle);
+	vm.startDriver();
     }
 
     /**
@@ -212,6 +223,7 @@ public class ApplicationManager extends Thread {
 					    currentDAG.activation.timer = new Timer();
 					    long period = Long.parseLong(words[1]);
 					    final DAG toRun = currentDAG;
+					    /*
 					    class DAGTimerEvent implements Runnable {
 						DAG toRun;
 
@@ -223,10 +235,14 @@ public class ApplicationManager extends Thread {
 						    vm.timerStartDag(toRun);
 						}
 					    }
+					    */
 					    currentDAG.activation.timer.scheduleAtFixedRate(new TimerTask() {
 						    public void run() {
+							/*
 							DAGTimerEvent r = new DAGTimerEvent(toRun);
 							enqueueTask(r, Constants.PRIORITY_HIGH);
+							*/
+							vm.timerStartDag(toRun);
 						    }
 						}, period, period);
 					}
@@ -444,26 +460,26 @@ public class ApplicationManager extends Thread {
 	    }
 	    drun.start(this);
 	} else {
-	    synchronized (running) {
-		if (checkConflict(dag)) {
-		    if (whetherAlreadyWaiting(dag)) {
-			return;
-		    } else {
-			DAGRuntime drun = new DAGRuntime(dag, env, vm,
-							 getNextInstanceID());
-			drun.state = Constants.DAGStates.WAITING;
-			synchronized (triggered) {
-			    triggered.addLast(drun);
-			}
-		    }
+	    if (checkConflict(dag)) {
+		if (whetherAlreadyWaiting(dag)) {
+		    return;
 		} else {
 		    DAGRuntime drun = new DAGRuntime(dag, env, vm,
 						     getNextInstanceID());
-		    
-		    running.put(drun.instanceID ,drun);
-		    
-		    drun.start(this);
+		    drun.state = Constants.DAGStates.WAITING;
+		    synchronized (triggered) {
+			triggered.addLast(drun);
+		    }
 		}
+	    } else {
+		DAGRuntime drun = new DAGRuntime(dag, env, vm,
+						 getNextInstanceID());
+		
+		synchronized (running) {
+		    running.put(drun.instanceID ,drun);
+		}
+		
+		drun.start(this);
 	    }
 	}
     }
@@ -507,30 +523,29 @@ public class ApplicationManager extends Thread {
 		}
 		drun.start(this);
 	    } else {
-		synchronized (running) {
-		    if (checkConflict(dag)) {
-			if (whetherAlreadyWaiting(dag)) {
-			    continue;
-			} else {
-			    DAGRuntime drun = new DAGRuntime(dag, env, vm,
-							     getNextInstanceID());
-			    drun.state = Constants.DAGStates.WAITING;
-			    synchronized (triggered) {
-				triggered.addLast(drun);
-			    }
-			    /*
-			      if (triggered.size() >= Parameters.maxWaitingDAGIns) {
-			      vm.driver.suspend();
-			      }
-			    */
-			}
+		if (checkConflict(dag)) {
+		    if (whetherAlreadyWaiting(dag)) {
+			continue;
 		    } else {
 			DAGRuntime drun = new DAGRuntime(dag, env, vm,
 							 getNextInstanceID());
-
-			running.put(drun.instanceID ,drun);
-			drun.start(this);
+			drun.state = Constants.DAGStates.WAITING;
+			synchronized (triggered) {
+			    triggered.addLast(drun);
+			}
+			/*
+			  if (triggered.size() >= Parameters.maxWaitingDAGIns) {
+			  vm.driver.suspend();
+			  }
+			*/
 		    }
+		} else {
+		    DAGRuntime drun = new DAGRuntime(dag, env, vm,
+						     getNextInstanceID());
+		    synchronized (running) {
+			running.put(drun.instanceID ,drun);
+		    }
+		    drun.start(this);
 		}
 	    }
 	}
@@ -667,26 +682,36 @@ public class ApplicationManager extends Thread {
 	    
 	LinkedList<DAGRuntime> toRemove = new LinkedList<DAGRuntime>();
 
-	synchronized (running) {
-	    synchronized (triggered) {
-		Iterator<DAGRuntime> it = triggered.iterator();
-		while (it.hasNext()) {
-		    d = it.next();
-		    if (!checkConflict(d.dag)) {
-			toRemove.add(d);
-			running.put(d.instanceID, d);
-			d.start(this);
-		    }
+	synchronized (triggered) {
+	    Iterator<DAGRuntime> it = triggered.iterator();
+	    while (it.hasNext()) {
+		d = it.next();
+		if (!checkConflict(d.dag)) {
+		    toRemove.add(d);
+		    //triggered.remove(d);
 		}
 	    }
+
+	    for (DAGRuntime dd: toRemove) {
+		triggered.remove(dd);
+	    }
 	}
-	    
+
+	for (DAGRuntime dd: toRemove) {
+	    synchronized (running) {
+		running.put(dd.instanceID, dd);
+	    }
+	    d.start(this);
+	}
+
+	/*
 	Iterator<DAGRuntime> it = toRemove.iterator();
 	synchronized (triggered) {
 	    while (it.hasNext()) {
 		triggered.remove(it.next());
 	    }
 	}
+	*/
     }
 
     /**
@@ -742,8 +767,10 @@ public class ApplicationManager extends Thread {
 	    before = System.nanoTime();
 	}
 	HashSet<String> output = new HashSet<String>();
-	for (DAGRuntime dr : running.values()) {
-	    output.addAll(dr.dag.terminal.output.keySet());
+	synchronized (running) {
+	    for (DAGRuntime dr : running.values()) {
+		output.addAll(dr.dag.terminal.output.keySet());
+	    }
 	}
 	Set<String> myInput = dag.toRead;
 	Set<String> myOutput = dag.terminal.output.keySet();
