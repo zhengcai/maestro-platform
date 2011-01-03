@@ -57,11 +57,19 @@ public class PacketsInView extends View {
 	    before = System.nanoTime();
 	}
 
+	incoming.addLast((PacketInEvent)e);
+
+	if (incoming.size() >= Parameters.batchInputNum) {
+	    return true;
+	} else {
+	    return false;
+	}
+	
+	/*
 	synchronized(incoming) {
 	    incoming.addLast((PacketInEvent)e);
-	    //int queueSize = Parameters.am.taskMgr.getQueueSize();
 		
-	    if (incoming.size() >= Parameters.batchInputNum/* || queueSize <= 5*/) {
+	    if (incoming.size() >= Parameters.batchInputNum) {
 		synchronized (queues) {
 		    LinkedList<PacketInEvent> toAdd = new LinkedList<PacketInEvent>();
 		    toAdd.addAll(incoming);
@@ -73,6 +81,7 @@ public class PacketsInView extends View {
 		return false;
 	    }
 	}
+	*/
     }
     
     @Override

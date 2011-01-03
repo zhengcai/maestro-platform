@@ -51,10 +51,12 @@ public class LocationManagementApp extends App {
 		
 	FlowsInView fis = new FlowsInView();
 		
-	LinkedList<PacketInEvent> work = null;
+	LinkedList<PacketInEvent> work = pis.incoming;
+	/*
 	synchronized (pis.queues) {
 	    work = pis.queues.removeFirst();
 	}
+	*/
 		
 	for (PacketInEvent pi : work) {
 	    hosts.acquireWrite();
@@ -92,6 +94,8 @@ public class LocationManagementApp extends App {
 	synchronized(Parameters.count) {
 	    Parameters.count.value += work.size();
 	}
+
+	work.clear();
 		
 	ViewsIOBucket output = new ViewsIOBucket();
 	output.addView(0, fis);

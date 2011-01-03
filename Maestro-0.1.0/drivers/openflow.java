@@ -56,51 +56,12 @@ public class openflow extends Driver {
     Random random;
 	
     private static class Switch {
-	/*
-    	public class WorkerThread implements Runnable {
-	    openflow of;
-	    Switch sw;
-	    ByteBuffer buffer;
-	    int size;
-	    public WorkerThread(openflow o, Switch s, ByteBuffer b, int si) {
-		of = o;
-		sw = s;
-		buffer = b;
-		size = si;
-	    }
-	    public void run() {
-		of.handleMessage(sw, sw.channel, buffer, size);
-		of.evaluateAndResume();
-		synchronized(sw.workQueue) {
-		    synchronized(sw.running) {
-			if (sw.workQueue.size() == 0) {
-			    sw.running.value = false;
-			} else {
-			    WorkerThread r = sw.workQueue.removeFirst();
-			    //Parameters.am.enqueueTask(r, Constants.PRIORITY_LOW);
-			}
-		    }
-		}
-	    }
-    	}
-	*/
-    	
 	public long dpid = 0;
 	public SocketChannel channel = null;
 	public int bufferSize = 0;
 	public byte[] buffer = new byte[BUFFERSIZE];
 	//public LinkedList<WorkerThread> workQueue;
 
-	/*
-	class MyBoolean {
-	    public boolean value;
-			
-	    public MyBoolean(boolean v) {
-		value = v;
-	    }
-	}
-	private MyBoolean running = new MyBoolean(false);
-	*/
 	public boolean chopping = false;
 		
 	/** For those lldps received before the dpid of this switch is known */
@@ -110,21 +71,6 @@ public class openflow extends Driver {
 	    //workQueue = new LinkedList<WorkerThread>();
 	    lldpQueue = new LinkedList<LLDPPacketInEvent>();
 	}
-
-	/*
-	public void enqueueTask(openflow o, ByteBuffer b, int si) {
-	    synchronized(workQueue) {
-		synchronized(running) {
-		    if (workQueue.size() == 0 && !running.value) {
-			running.value = true;
-			//Parameters.am.enqueueTask(new WorkerThread(o, this, b, si), Constants.PRIORITY_LOW);
-		    } else {
-			workQueue.addLast(new WorkerThread(o, this, b, si));
-		    }
-		}
-	    }
-	}
-	*/
 
 	synchronized public int send(ByteBuffer pkt) {
 	    int ret = 0;
@@ -252,36 +198,6 @@ public class openflow extends Driver {
 			    swRRPool.addSwitch(sw);
 			    sendHelloMessage(sw);
 			}
-			/*
-			else if (k.isReadable()) {
-			    Switch sw = chnl2switch.get((SocketChannel)k.channel());
-			    Utilities.Assert(sw.channel == k.channel(), "Channels do not match!");
-			    ByteBuffer buffer = ByteBuffer.allocate(BUFFERSIZE);
-			    int size = sw.channel.read(buffer);
-			    if (size == -1) {
-				sw.channel.close();
-				return;
-			    } else if (size == 0) {
-				return;
-			    }
-
-			    if (Parameters.divide == 0) {
-				handleMessage(sw, sw.channel, buffer, size);
-			    } else {
-				if (pendingTasks.value > Parameters.queueUpperBound) {
-				    suspend();
-				}
-							
-				whetherContinue();
-				    			
-				sw.enqueueTask(this, buffer, size);
-				synchronized(pendingTasks) {
-				    pendingTasks.value ++;
-				}
-			    }
-							
-			}
-			*/
 		    } catch (IOException e) {
 			e.printStackTrace();
 			k.channel().close();
