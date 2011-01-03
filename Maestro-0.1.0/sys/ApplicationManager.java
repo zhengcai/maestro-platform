@@ -461,13 +461,13 @@ public class ApplicationManager extends Thread {
 	    drun.start(this);
 	} else {
 	    if (checkConflict(dag)) {
-		if (whetherAlreadyWaiting(dag)) {
-		    return;
-		} else {
-		    DAGRuntime drun = new DAGRuntime(dag, env, vm,
-						     getNextInstanceID());
-		    drun.state = Constants.DAGStates.WAITING;
-		    synchronized (triggered) {
+		synchronized (triggered) {
+		    if (whetherAlreadyWaiting(dag)) {
+			return;
+		    } else {
+			DAGRuntime drun = new DAGRuntime(dag, env, vm,
+							 getNextInstanceID());
+			drun.state = Constants.DAGStates.WAITING;
 			triggered.addLast(drun);
 		    }
 		}
@@ -478,7 +478,7 @@ public class ApplicationManager extends Thread {
 		synchronized (running) {
 		    running.put(drun.instanceID ,drun);
 		}
-		
+
 		drun.start(this);
 	    }
 	}
@@ -524,14 +524,14 @@ public class ApplicationManager extends Thread {
 		drun.start(this);
 	    } else {
 		if (checkConflict(dag)) {
-		    if (whetherAlreadyWaiting(dag)) {
-			continue;
-		    } else {
-			DAGRuntime drun = new DAGRuntime(dag, env, vm,
-							 getNextInstanceID());
-			drun.state = Constants.DAGStates.WAITING;
-			synchronized (triggered) {
-			    //Utilities.printlnDebug("Add triggered "+drun.dag.id+" instance "+drun.instanceID);
+		    synchronized (triggered) {
+			if (whetherAlreadyWaiting(dag)) {
+			    continue;
+			} else {
+			    DAGRuntime drun = new DAGRuntime(dag, env, vm,
+							     getNextInstanceID());
+			    drun.state = Constants.DAGStates.WAITING;
+			    //Utilities.printlnDebug("("+workerMgr.getCurrentWorkerID()+") Add triggered "+drun.dag.id+" instance "+drun.instanceID);
 			    triggered.addLast(drun);
 			}
 			/*
@@ -556,11 +556,9 @@ public class ApplicationManager extends Thread {
     }
 
     public boolean whetherAlreadyWaiting(DAG dag) {
-	synchronized (triggered) {
-	    for (DAGRuntime dr : triggered) {
-		if (dr.dag.id == dag.id) {
-		    return true;
-		}
+	for (DAGRuntime dr : triggered) {
+	    if (dr.dag.id == dag.id) {
+		return true;
 	    }
 	}
 	return false;
@@ -688,7 +686,7 @@ public class ApplicationManager extends Thread {
 	    while (it.hasNext()) {
 		d = it.next();
 		if (!checkConflict(d.dag)) {
-		    toRemove.add(d);
+		    toRemove.addLast(d);
 		    //triggered.remove(d);
 		}
 	    }
@@ -698,11 +696,12 @@ public class ApplicationManager extends Thread {
 	    }
 	}
 
+	//Utilities.printlnDebug("("+workerMgr.getCurrentWorkerID()+") torun size is "+toRemove.size());
 	for (DAGRuntime dd: toRemove) {
 	    synchronized (running) {
 		running.put(dd.instanceID, dd);
 	    }
-	    //Utilities.printDebug("Trigger to run ");
+	    //Utilities.printDebug("("+workerMgr.getCurrentWorkerID()+") Trigger to run ");
 	    d.start(this);
 	}
 
@@ -723,6 +722,7 @@ public class ApplicationManager extends Thread {
      * @param d
      *            the finishing DAG
      */
+    /*
     public void DAGAbort(DAGRuntime d) {
 	d.abort();
 	synchronized (running) {
@@ -754,6 +754,7 @@ public class ApplicationManager extends Thread {
 	    }
 	}
     }
+    */
 
     /**
      * Check whether this DAG are conflicting with any current running DAGs

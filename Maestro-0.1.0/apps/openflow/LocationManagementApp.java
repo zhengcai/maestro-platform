@@ -59,21 +59,20 @@ public class LocationManagementApp extends App {
 	*/
 		
 	for (PacketInEvent pi : work) {
-	    hosts.acquireWrite();
 	    try {
 		//. Warning: currently each end host can only register once with Maestro
 		if (null == hosts.getHostLocation(pi.flow.dlSrc)) {
+		    hosts.acquireWrite();
 		    hosts.addHostLocation(pi.flow.dlSrc, new RegisteredHostsView.Location(pi.dpid, pi.inPort));
 		    Utilities.printlnDebug("Registering "+String.format("MAC %d-%d-%d-%d-%d-%d",
 									pi.flow.dlSrc[0], pi.flow.dlSrc[1], pi.flow.dlSrc[2],
 									pi.flow.dlSrc[3], pi.flow.dlSrc[4], pi.flow.dlSrc[5])
 					   +" at "+pi.dpid+" ("+pi.inPort+")");
-				
+		    hosts.releaseWrite();
 		}
 	    } catch (NullPointerException e) {
 		continue;
 	    }
-	    hosts.releaseWrite();
 	    RegisteredHostsView.Location dst = hosts.getHostLocation(pi.flow.dlDst);
 	    if (null == dst) {
 		if (Utilities.whetherMACBroadCast(pi.flow.dlDst)) {
@@ -84,7 +83,9 @@ public class LocationManagementApp extends App {
 	    } else {
 		//. The registered switch has already left
 		if (null == sws.getSwitch(dst.dpid)) {
+		    hosts.acquireWrite();
 		    hosts.removeHostLocation(pi.flow.dlDst);
+		    hosts.releaseWrite();
 		    fis.queue.addLast(new FlowsInView.FlowIn(pi, RegisteredHostsView.Location_Unknown));
 		} else
 		    fis.queue.addLast(new FlowsInView.FlowIn(pi, dst));

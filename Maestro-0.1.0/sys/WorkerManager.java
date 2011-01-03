@@ -50,7 +50,7 @@ public class WorkerManager {
     public int getCurrentWorkerID() {
 	Integer ret = lid2id.get(Thread.currentThread().getId());
 	if (null == ret)
-	    return 0;
+	    return -1;
 	else
 	    return ret.intValue();
     }

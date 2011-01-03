@@ -73,8 +73,6 @@ public class DAGRuntime {
 	
     private long perfBefore;
 
-    public boolean finished = false;
-	
     public DAGRuntime(DAG d, Environment theEnv, ViewManager vm, int instance) {
 	dag = d;
 	sem = new Semaphore(1);
@@ -113,12 +111,14 @@ public class DAGRuntime {
      * with earlier views.
      */
     public void start(ApplicationManager am) {
+	/*
 	if (finished)
 	    return;
+	*/
     	if (Parameters.measurePerf)
 	    perfBefore = System.nanoTime();
     	
-    	//Utilities.printlnDebug(System.currentTimeMillis()+" Starting DAG "+dag.id+" Instance "+instanceID);
+    	//Utilities.printlnDebug("("+am.workerMgr.getCurrentWorkerID()+") "+System.currentTimeMillis()+" Starting DAG "+dag.id+" Instance "+instanceID);
     	state = Constants.DAGStates.RUNNING;
     	
     	//. FIXME: This code is copied from Produce().  We should consolidate them.
@@ -129,6 +129,7 @@ public class DAGRuntime {
     	this.am = am;
     	
     	Iterator<AppInstanceEdge> it = dag.activation.edges.iterator();
+
     	while (it.hasNext()) {
 	    AppInstanceEdge e = it.next();
 	    DAGRuntimeThread tr = new DAGRuntimeThread(e.next, am, this);
@@ -154,26 +155,19 @@ public class DAGRuntime {
     	if (Parameters.measurePerf) {
 	    Parameters.t8 += System.nanoTime() - perfBefore;
     	}
-    	//Utilities.printlnDebug(System.currentTimeMillis()+" Finishing DAG "+dag.id+" Instance "+instanceID);
-	finished = true;
+    	//Utilities.printlnDebug("("+am.workerMgr.getCurrentWorkerID()+") "+System.currentTimeMillis()+" Finishing DAG "+dag.id+" Instance "+instanceID);
+	//finished = true;
     }
-    
+
+    /*
     public void abort() {
-    	// TODO: adjust this according to the new workqueue framework
-    	/*
-	  for(SuspendedThreadNode stn : suspended) {
-	  stn.getThread().stop();
-	  }
-	  for(DAGRuntimeThread drt : active) {
-	  if(drt != Thread.currentThread()) drt.stop();
-	  }
-    	*/
     	suspended.clear();
     	
     	env.clearLocal();
     	violations.clear();
     	state = Constants.DAGStates.IDLE;
     }
+    */
     
     /** Add a new NodeThread to the DAG and start the thread */
     public void addNodeThread(DAGRuntimeThread n) {

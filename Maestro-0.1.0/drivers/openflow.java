@@ -72,19 +72,32 @@ public class openflow extends Driver {
 	    lldpQueue = new LinkedList<LLDPPacketInEvent>();
 	}
 
-	synchronized public int send(ByteBuffer pkt) {
+	public int send(ByteBuffer pkt) {
 	    int ret = 0;
-	    try {
-		int remain = pkt.capacity();
-		byte[] buf = pkt.array();
-		int pos = 0;
-		while ((ret = channel.write(pkt)) < remain) {
-		    pos += ret;
-		    pkt = ByteBuffer.wrap(buf, pos, remain-ret);
-		    remain -= ret;
+	    synchronized(channel) {
+		try {
+		    int count = 0;
+		    while(pkt.hasRemaining()) {
+			channel.write(pkt);
+			count++;
+			if (count > 100000) {
+			    Utilities.printlnDebug("DAMN too many tries");
+			    count = 0;
+			}
+		    }
+		    /*
+		    int remain = pkt.capacity();
+		    byte[] buf = pkt.array();
+		    int pos = 0;
+		    while ((ret = channel.write(pkt)) < remain) {
+			pos += ret;
+			pkt = ByteBuffer.wrap(buf, pos, remain-ret);
+			remain -= ret;
+		    }
+		    */
+		} catch (Exception e) {
+		    e.printStackTrace();
 		}
-	    } catch (Exception e) {
-		//e.printStackTrace();
 	    }
 	    return ret;
 	}
@@ -571,9 +584,8 @@ public class openflow extends Driver {
     /* For better paralizability of memory management,
      * we do not do partition consolidation
      */
-    /*
-      HashMap<Long, Partition> pendingPts = new HashMap<Long, Partition>();
-    */
+    //HashMap<Long, Partition> pendingPts = new HashMap<Long, Partition>();
+    
 	
     private boolean processToSpecificSwitchEvent(LinkedList<Event> events) {
 
@@ -670,16 +682,16 @@ public class openflow extends Driver {
 	 * we do not do partition consolidation
 	 */
 	/*
-	  synchronized(pendingPts) {
-	  Partition pp = pendingPts.get(pt.dpid);
-	  if (pp != null) {
-	  pp.es.addAll(pt.es);
-	  pp.totalLength += pt.totalLength;
-	  //. We can consolidate this partition to an existing one
-	  toRun = false;
-	  pt.es.clear();
-	  }
-	  }
+	synchronized(pendingPts) {
+	    Partition pp = pendingPts.get(pt.dpid);
+	    if (pp != null) {
+		pp.es.addAll(pt.es);
+		pp.totalLength += pt.totalLength;
+		//. We can consolidate this partition to an existing one
+		toRun = false;
+		pt.es.clear();
+	    }
+	}
 	*/
 	if (toRun) {
 	    OutputWork work = new OutputWork(this);
@@ -688,9 +700,9 @@ public class openflow extends Driver {
 	     * we do not do partition consolidation
 	     */
 	    /*
-	      synchronized(pendingPts) {
-	      pendingPts.put(pt.dpid, pt);
-	      }
+	    synchronized(pendingPts) {
+		pendingPts.put(pt.dpid, pt);
+	    }
 	    */
 	    //Parameters.am.enqueueBindingTask(worker, Constants.PRIORITY_HIGH);
 	    work.run();
