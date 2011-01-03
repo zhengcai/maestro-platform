@@ -72,6 +72,8 @@ public class DAGRuntime {
     ApplicationManager am;
 	
     private long perfBefore;
+
+    public boolean finished = false;
 	
     public DAGRuntime(DAG d, Environment theEnv, ViewManager vm, int instance) {
 	dag = d;
@@ -111,6 +113,8 @@ public class DAGRuntime {
      * with earlier views.
      */
     public void start(ApplicationManager am) {
+	if (finished)
+	    return;
     	if (Parameters.measurePerf)
 	    perfBefore = System.nanoTime();
     	
@@ -151,6 +155,7 @@ public class DAGRuntime {
 	    Parameters.t8 += System.nanoTime() - perfBefore;
     	}
     	//Utilities.printlnDebug(System.currentTimeMillis()+" Finishing DAG "+dag.id+" Instance "+instanceID);
+	finished = true;
     }
     
     public void abort() {

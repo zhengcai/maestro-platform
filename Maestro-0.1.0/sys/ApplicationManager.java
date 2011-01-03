@@ -531,6 +531,7 @@ public class ApplicationManager extends Thread {
 							 getNextInstanceID());
 			drun.state = Constants.DAGStates.WAITING;
 			synchronized (triggered) {
+			    //Utilities.printlnDebug("Add triggered "+drun.dag.id+" instance "+drun.instanceID);
 			    triggered.addLast(drun);
 			}
 			/*
@@ -701,6 +702,7 @@ public class ApplicationManager extends Thread {
 	    synchronized (running) {
 		running.put(dd.instanceID, dd);
 	    }
+	    //Utilities.printDebug("Trigger to run ");
 	    d.start(this);
 	}
 
