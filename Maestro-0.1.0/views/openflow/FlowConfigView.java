@@ -22,6 +22,7 @@ package views.openflow;
 
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.ArrayList;
 
 import drivers.Driver;
 import events.Event;
@@ -51,10 +52,16 @@ public class FlowConfigView extends View {
 
     @Override
 	public void commit(Driver driver) {
+	ArrayList<LinkedList<Event>> remaining = new ArrayList<LinkedList<Event>>();
 	for (LinkedList<Event> events : configs.values()) {
-	    driver.commitEvent(events);
+	    if (!driver.commitEvent(events))
+		remaining.add(events);
 	}
 	configs.clear();
+	for (LinkedList<Event> events : remaining) {
+	    while (!driver.commitEvent(events));
+	}
+	remaining.clear();
     }
 
     @Override

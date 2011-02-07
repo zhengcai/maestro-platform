@@ -20,7 +20,7 @@
 
 package views.openflow;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import drivers.Driver;
 import events.Event;
@@ -31,33 +31,36 @@ import views.View;
  * Contains MAC addresses learned by all switches
  * @author Zheng Cai
  */
-public class LearnedMACsView extends View {    
+public class LearnedMACsView extends View {
     /** All MAC addresses on each of all switches
 	First index(Long) is switch's dpid
 	Second index(Long) is the MAC
 	The value(Integer) is the port on that switch where the MAC was learned
     */
-    HashMap<Long, HashMap<Long, Integer>> learnedMACs;
+    ConcurrentHashMap<Long, ConcurrentHashMap<Long, Short>> learnedMACs;
 	
     public LearnedMACsView() {
-	learnedMACs = new HashMap<Long, HashMap<Long, Integer>>();
+	learnedMACs = new ConcurrentHashMap<Long, ConcurrentHashMap<Long, Short>>();
     }
-	
-    public Integer getMACLocation(long dpid, short[] mac) {
-	HashMap<Long, Integer> sw = learnedMACs.get(dpid);
+
+    
+    public Short getMACLocation(long dpid, short[] mac) {
+	ConcurrentHashMap<Long, Short> sw = learnedMACs.get(dpid);
 	if (null == sw) return null;
 	return sw.get(Utilities.GetLongFromMAC(mac));
     }
 	
     public void addMACLocation(long dpid, short[] mac, int port) {
-	HashMap<Long, Integer> sw = learnedMACs.get(dpid);
+	ConcurrentHashMap<Long, Short> sw = learnedMACs.get(dpid);
 	if (null == sw) {
-	    sw = new HashMap<Long, Integer>();
-	    learnedMACs.put(dpid, sw);
+	    sw = new ConcurrentHashMap<Long, Short>();
+	    synchronized (learnedMACs) {
+		learnedMACs.put(dpid, sw);
+	    }
 	}
-	sw.put(Utilities.GetLongFromMAC(mac), port);
+	sw.put(Utilities.GetLongFromMAC(mac), (short)port);
     }
-
+    
     @Override
 	public void commit(Driver driver) {
 		

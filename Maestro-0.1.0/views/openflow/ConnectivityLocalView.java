@@ -109,6 +109,7 @@ public class ConnectivityLocalView extends View {
     }
 	
     public Collection<Link> getAllLinks() {
+	acquireWrite();
 	LinkedList<Link> result = new LinkedList<Link>();
 	for (long A : links.keySet()) {
 	    HashMap<Long, Link> col = links.get(A);
@@ -118,10 +119,12 @@ public class ConnectivityLocalView extends View {
 		}
 	    }
 	}
+	releaseWrite();
 	return result;
     }
 	
     public int getNodesNum() {
+	acquireWrite();
 	int result = 0;
 	HashSet<Long> seen = new HashSet<Long>();
 	for (long A : links.keySet()) {
@@ -140,6 +143,7 @@ public class ConnectivityLocalView extends View {
 		}
 	    }
 	}
+	releaseWrite();
 	return result;
     }
 	

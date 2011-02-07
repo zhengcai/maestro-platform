@@ -69,6 +69,9 @@ public class ApplicationManager extends Thread {
     /** Memory manager */
     public MemoryManager memMgr;
 
+    /** Data log manager */
+    public DataLogManager dataLogMgr;
+
     /**
      * Creates a new instance of ApplicationManager Initialize the whole system
      * read the configuration file and start applications contained in this file
@@ -94,10 +97,13 @@ public class ApplicationManager extends Thread {
 	loadSystem();
 	vm.loadDriver(Parameters.bundle);
 	workerMgr = new WorkerManager();
-	System.err.println("# workers is "+Parameters.divide);
+	dataLogMgr = new DataLogManager(workerMgr);
+	dataLogMgr.addLogs(Parameters.divide);
+
 	for (int i = 0; i < Parameters.divide; i++) {
 	    workerMgr.addThread(vm.driver.newTask());
 	}
+	
 
 	if (Parameters.useMemoryMgnt) {
 	    memMgr = new MemoryManager();

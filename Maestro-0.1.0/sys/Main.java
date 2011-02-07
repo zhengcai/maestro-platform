@@ -21,6 +21,7 @@
 package sys;
 
 import java.io.*;
+import views.openflow.*;
 
 /**
  * The Main class, entry point of the program.
@@ -52,14 +53,16 @@ public class Main {
 		    Parameters.divide = Integer.parseInt(words[1]);
 		    Utilities.Assert(Parameters.divide <= Constants.MAXIMUM_DIVIDE, 
 				     "numThreads exceeds the maximum value allowed which is "+Constants.MAXIMUM_DIVIDE);
-		} else if (words[0].compareToIgnoreCase("threadBind") == 0) {
+		} /*else if (words[0].compareToIgnoreCase("threadBind") == 0) {
 		    Parameters.threadBind = Integer.parseInt(words[1]);
 		} else if (words[0].compareToIgnoreCase("countDone") == 0) {
 		    Parameters.countDone = Integer.parseInt(words[1]);
 		} else if (words[0].compareToIgnoreCase("queueUpperBound") == 0) {
 		    Parameters.queueUpperBound = Integer.parseInt(words[1]);
-		} else if (words[0].compareToIgnoreCase("outputLog") == 0) {
+		    } */else if (words[0].compareToIgnoreCase("outputLog") == 0) {
 		    Utilities.openLogFile(words[1]);
+		} else if (words[0].compareToIgnoreCase("dataLogFile") == 0) {
+		    Parameters.dataLogFile = words[1];
 		} else if (words[0].compareToIgnoreCase("port") == 0) {
 		    Parameters.listenPort = Integer.parseInt(words[1]);
 		} else {
@@ -80,6 +83,18 @@ public class Main {
      * @param args the command line arguments
      */
     public static void main(String[] args) throws Exception {
+	/*
+	MACTrie trie = new MACTrie();
+	short[] mac1 = {1,2,3,4,5,6};
+	short[] mac2 = {10,20,30,40,50,60};
+	short[] mac3 = {100, 200, 300, 400, 500, 600};
+	trie.addEntry(mac1, (short)1);
+	trie.addEntry(mac2, (short)2);
+
+	System.out.println(trie.getEntry(mac1));
+	System.out.println(trie.getEntry(mac2));
+	System.out.println(trie.getEntry(mac3));
+	*/
 	if (args.length != 3) {
 	    System.err.println("Usage: parameter-configuration-file dag-file runConsole");
 	    System.exit(0);

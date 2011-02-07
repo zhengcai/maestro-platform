@@ -80,7 +80,7 @@ End DAG
 
 Begin DAG
   Node a Activation
-    Timer 2000
+    Timer 3000
   End Node
   Node n1 ProbeApp
     Input JoinedSwitchesView switches

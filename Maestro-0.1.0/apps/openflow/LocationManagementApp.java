@@ -25,6 +25,7 @@ import java.util.LinkedList;
 import events.openflow.PacketInEvent;
 import sys.Parameters;
 import sys.Utilities;
+import sys.DataLogManager;
 import views.ViewsIOBucket;
 import views.openflow.RegisteredHostsView;
 import views.openflow.FlowsInView;
@@ -44,30 +45,45 @@ public class LocationManagementApp extends App {
 	JoinedSwitchesView sws = (JoinedSwitchesView)input.getView(1);
 	RegisteredHostsView hosts = (RegisteredHostsView)input.getView(2);
 
-	//. For throughput measurement purpose
-	if (Parameters.before == 0) {
-	    Parameters.before = System.nanoTime();
-	}
-		
 	FlowsInView fis = new FlowsInView();
 		
 	LinkedList<PacketInEvent> work = pis.incoming;
-	/*
-	synchronized (pis.queues) {
-	    work = pis.queues.removeFirst();
-	}
-	*/
 		
 	for (PacketInEvent pi : work) {
+	    class LogContent extends DataLogManager.Content {
+		public long dpid;
+		public int size;
+		public LogContent(long d, int s) {
+		    dpid = d;
+		    size = s;
+		}
+		public String toString() {
+		    return String.format("%d %d\n", dpid, size);
+		}
+	    }
+	    if (Parameters.am.dataLogMgr.enabled && pi.reason == 1) {
+		if (!Parameters.warmuped) {
+		    Parameters.warmuped = true;
+		    Parameters.am.dataLogMgr.addEntry(new LogContent(pi.dpid, -1));
+		}
+	    }
+	    if (Parameters.am.dataLogMgr.enabled && pi.reason == 2) {
+		if (!Parameters.changePeriod) {
+		    Parameters.changePeriod = true;
+		    Parameters.am.dataLogMgr.addEntry(new LogContent(pi.dpid, -2));
+		}
+	    }
 	    try {
 		//. Warning: currently each end host can only register once with Maestro
 		if (null == hosts.getHostLocation(pi.flow.dlSrc)) {
 		    hosts.acquireWrite();
 		    hosts.addHostLocation(pi.flow.dlSrc, new RegisteredHostsView.Location(pi.dpid, pi.inPort));
+		    
 		    Utilities.printlnDebug("Registering "+String.format("MAC %d-%d-%d-%d-%d-%d",
 									pi.flow.dlSrc[0], pi.flow.dlSrc[1], pi.flow.dlSrc[2],
 									pi.flow.dlSrc[3], pi.flow.dlSrc[4], pi.flow.dlSrc[5])
 					   +" at "+pi.dpid+" ("+pi.inPort+")");
+		    
 		    hosts.releaseWrite();
 		}
 	    } catch (NullPointerException e) {
@@ -90,10 +106,6 @@ public class LocationManagementApp extends App {
 		} else
 		    fis.queue.addLast(new FlowsInView.FlowIn(pi, dst));
 	    }
-	}
-
-	synchronized(Parameters.count) {
-	    Parameters.count.value += work.size();
 	}
 
 	work.clear();

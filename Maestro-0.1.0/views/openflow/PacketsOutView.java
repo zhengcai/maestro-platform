@@ -22,6 +22,7 @@ package views.openflow;
 
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.ArrayList;
 
 import drivers.Driver;
 
@@ -51,11 +52,17 @@ public class PacketsOutView extends View {
 
     @Override
 	public void commit(Driver driver) {
+	ArrayList<LinkedList<Event>> remaining = new ArrayList<LinkedList<Event>>();
 	for (LinkedList<Event> events : pkts.values()) {
-	    driver.commitEvent(events);
+	    if (!driver.commitEvent(events))
+		remaining.add(events);
 	    //events.clear();
 	}
 	pkts.clear();
+	for (LinkedList<Event> events : remaining) {
+	    while (!driver.commitEvent(events));
+	}
+	remaining.clear();
     }
 
     @Override

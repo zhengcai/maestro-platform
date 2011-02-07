@@ -52,9 +52,10 @@ public class PacketsInView extends View {
 	if (!(e instanceof PacketInEvent)) {
 	    return false;
 	}
-	long before = 0;
-	if (Parameters.measurePerf) {
-	    before = System.nanoTime();
+
+	//. Currently consider flush PacketInEvent to be invalid dummy event
+	if (((PacketInEvent)e).flush) {
+	    return incoming.size() > 0;
 	}
 
 	incoming.addLast((PacketInEvent)e);

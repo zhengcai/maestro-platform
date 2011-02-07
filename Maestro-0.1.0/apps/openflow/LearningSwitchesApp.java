@@ -57,24 +57,25 @@ public class LearningSwitchesApp extends App {
 	FlowConfigView config = new FlowConfigView();
 	PacketsOutView pkts = new PacketsOutView();
 
-	LinkedList<PacketInEvent> work = null;
-	synchronized (pis.queues) {
-	    work = pis.queues.removeFirst();
-	}
+	LinkedList<PacketInEvent> work = pis.incoming;
 		
 	for (PacketInEvent pi : work) {
-	    macs.acquireWrite();
+	    /*
 	    try {
 		macs.addMACLocation(pi.dpid, pi.flow.dlSrc, pi.inPort);
+		
 		Utilities.printlnDebug("Learning "+String.format("MAC %d-%d-%d-%d-%d-%d",
 								 pi.flow.dlSrc[0], pi.flow.dlSrc[1], pi.flow.dlSrc[2],
 								 pi.flow.dlSrc[3], pi.flow.dlSrc[4], pi.flow.dlSrc[5])
 				       +" at "+pi.dpid+" ("+pi.inPort+")");
+		
 	    } catch (NullPointerException e) {
 		continue;
 	    }
-	    macs.releaseWrite();
-	    Integer outPort = macs.getMACLocation(pi.dpid, pi.flow.dlDst);
+	    
+	    Short outPort = macs.getMACLocation(pi.dpid, pi.flow.dlDst);
+	    */
+	    Short outPort = null;
 	    if (null != outPort) {
 		FlowModEvent fm = null;
 		if (Parameters.useMemoryMgnt) {
@@ -134,6 +135,8 @@ public class LearningSwitchesApp extends App {
 		pkts.addPacketOutEvent(po);
 	    }
 	}
+
+	work.clear();
 
 	ViewsIOBucket output = new ViewsIOBucket();
 	output.addView(0, config);

@@ -142,6 +142,7 @@ public class PacketInEvent extends MemoryPoolEvent {
     public DataPayload data;
     public FlowInfo flow;
     public EthernetHeader header; //. Assume all packets are ethernet frames
+    public boolean flush = false; //. Whether this is a flush dummy event
 
     public PacketInEvent() {
 	super(-1);
