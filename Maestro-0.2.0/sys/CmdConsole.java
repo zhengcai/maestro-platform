@@ -21,6 +21,14 @@
 package sys;
 
 import java.io.*;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.util.*;
 
 import events.openflow.PacketInEvent;
 import views.openflow.ConnectivityLocalView;
@@ -35,15 +43,81 @@ import views.View;
 public class CmdConsole extends Thread {
     ApplicationManager appManager;
     ViewManager viewManager;
+    
+    int mode;
+    public static final int INTERACTIVE = 1;
+    public static final int DAEMON = 0;
 
-    public CmdConsole(ApplicationManager cm, ViewManager vm) {
-	appManager = cm;
+    public CmdConsole(ApplicationManager am, ViewManager vm, int m) {
+	appManager = am;
 	viewManager = vm;
 	this.setName("CmdConsole");
 	setDaemon(true);
+	mode = m;
     }
 	
     public void run() {
+	if (mode == INTERACTIVE)
+	    interactive();
+	if (mode == DAEMON)
+	    daemon();
+    }
+
+    public void daemon() {
+	final int BUFFERSIZE = 4000;
+	try {
+	    int port = Parameters.daemonPort;
+	    Selector s = Selector.open();
+	    ServerSocketChannel acceptChannel = ServerSocketChannel.open();
+	    acceptChannel.configureBlocking(false);
+	    byte[] ip = {0, 0, 0, 0};
+	    InetAddress lh = InetAddress.getByAddress(ip);
+	    InetSocketAddress isa = new InetSocketAddress(lh, port);
+	    acceptChannel.socket().bind(isa);
+	    acceptChannel.socket().setReuseAddress(true);
+
+	    SelectionKey acceptKey = acceptChannel.register(s, SelectionKey.OP_ACCEPT);
+	    ByteBuffer buffer = ByteBuffer.allocate(BUFFERSIZE);
+	    
+	    while (s.select() > 0) {
+		Set<SelectionKey> readyKeys = s.selectedKeys();
+		for (SelectionKey k : readyKeys) {
+		    try {
+			if (k.isAcceptable()) {
+			    SocketChannel channel = ((ServerSocketChannel)k.channel()).accept();
+			    channel.configureBlocking(false);
+			    SelectionKey clientKey = channel.register(s, SelectionKey.OP_READ);
+			} else if (k.isReadable()) {
+			    SocketChannel channel = (SocketChannel)k.channel();
+			    buffer.clear();
+			    int size = channel.read(buffer);
+			    if (size == -1) {
+				channel.close();
+				continue;
+			    } else if (size == 0) {
+				continue;
+			    }
+
+			    buffer.clear();
+			    for (int i=0;i<Parameters.divide;i++) {
+				buffer.put(String.format("Worker %d counter %d\n", i, appManager.workerMgr.getCounter(i)).getBytes());;
+			    }
+			    buffer.flip();
+			    size = channel.write(buffer);
+			}
+		    } catch (IOException e) {
+			e.printStackTrace();
+			k.channel().close();
+		    }
+		}
+		readyKeys.clear();
+	    }
+	} catch (IOException e) {
+	    e.printStackTrace();
+	}
+    }
+
+    public void interactive() {
 	printOptions();
 	while (true) {
 	    System.out.print("->");

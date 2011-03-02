@@ -70,6 +70,7 @@ public class ProbeApp extends App {
 	//. TODO: Currently not compatible to standard LLDP, nor to NOX
 	//. right now just a temporary simplified implementation for Maestro
 	PacketOutEvent ret = new PacketOutEvent();
+	ret.send = true;
 	ret.dpid = sw.dpid;
 	ret.bufferId = OFPConstants.OP_UNBUFFERED_BUFFER_ID;
 	ret.inPort = OFPConstants.OfpPort.OFPP_CONTROLLER;

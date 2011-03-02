@@ -49,6 +49,8 @@ public class RouteFlowApp extends App {
 	FlowConfigView config = new FlowConfigView();
 	PacketsOutView pkts = new PacketsOutView();
 	for (FlowsInView.FlowIn fl : fis.queue) {
+	    //addPacketOut(fl.pi, OFPConstants.OfpPort.OFPP_FLOOD, pkts);
+	    
 	    //. This is a broadcast packet, send it out to OFPP_FLOOD
 	    if (fl.dst == RegisteredHostsView.MAC_Broad_Cast) {
 		config.addFlowModEvent(createFlowModAdd(fl.pi, fl.pi.dpid, OFPConstants.OfpPort.OFPP_FLOOD));
@@ -92,6 +94,7 @@ public class RouteFlowApp extends App {
 		    Parameters.am.memMgr.freePacketInEvent(fl.pi);
 		}
 	    }
+	    
 	}
 		
 	ViewsIOBucket output = new ViewsIOBucket();

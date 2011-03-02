@@ -84,7 +84,8 @@ public class Parameters {
     public static long running = 0;
 
     public static int listenPort = 0;
+    public static int daemonPort = 0;
 
-    public static boolean runConsole = true;
+    public static int consoleMode = 0;
     public static String dataLogFile = null;
 }

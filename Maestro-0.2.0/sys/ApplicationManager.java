@@ -81,7 +81,7 @@ public class ApplicationManager extends Thread {
      */
     public ApplicationManager(String conf) {
 	vm = new ViewManager(this);
-	console = new CmdConsole(this, vm);
+	console = new CmdConsole(this, vm, Parameters.consoleMode);
 	configFile = conf;
 	dags = new HashMap<Integer, DAG>();
 	running = new HashMap<Integer, DAGRuntime>();	
@@ -96,6 +96,9 @@ public class ApplicationManager extends Thread {
 	*/
 	loadSystem();
 	vm.loadDriver(Parameters.bundle);
+
+	console.start();
+	
 	workerMgr = new WorkerManager();
 	dataLogMgr = new DataLogManager(workerMgr);
 	dataLogMgr.addLogs(Parameters.divide);
@@ -103,26 +106,12 @@ public class ApplicationManager extends Thread {
 	for (int i = 0; i < Parameters.divide; i++) {
 	    workerMgr.addThread(vm.driver.newTask());
 	}
-	
 
 	if (Parameters.useMemoryMgnt) {
 	    memMgr = new MemoryManager();
 	}
     }
 
-    /*
-    public void enqueueTask(Runnable r, int priority) {
-	taskMgr.execute(r, priority);
-    }
-    
-    public void enqueueBindingTask(Runnable r, int priority) {
-	if (1 == Parameters.threadBind)
-	    taskMgr.bindingExecute(r, priority);
-	else
-	    taskMgr.execute(r, priority);
-    }
-    */
-    
     /**
      * Start the ApplicationManager, and it will start the whole system TODO So
      * it seems like you're loading all of your DAGs all at once. I believe the
@@ -131,8 +120,6 @@ public class ApplicationManager extends Thread {
      */
     public void run() {
 	updateTriggerMap();
-	if (Parameters.runConsole)
-	    console.start();
 	vm.startDriver();
     }
 

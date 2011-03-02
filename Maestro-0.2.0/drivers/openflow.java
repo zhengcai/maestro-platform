@@ -55,48 +55,43 @@ import headers.LLDPHeader;
  */
 public class openflow extends Driver {
     Random random;
+    public boolean toprint = true;
 	
     private static class Switch {
 	public long dpid = 0;
 	public SocketChannel channel = null;
 	public int bufferSize = 0;
 	public byte[] buffer = new byte[BUFFERSIZE];
-	//public LinkedList<WorkerThread> workQueue;
+	//public ByteBuffer outputBuffer;
 
 	public boolean chopping = false;
 	public boolean sending = false;
 
 	public int chances = 0;
+	public int skipped = 0;
 	public long totalChopTime = 0;
 	public int totalSize = 0;
+	public int zeroes = 0;
 		
 	/** For those lldps received before the dpid of this switch is known */
 	private LinkedList<LLDPPacketInEvent> lldpQueue;
 		
 	public Switch() {
-	    //workQueue = new LinkedList<WorkerThread>();
 	    lldpQueue = new LinkedList<LLDPPacketInEvent>();
+	    //outputBuffer = ByteBuffer.allocate(20000);
 	}
 
 	public int send(ByteBuffer pkt) {
 	    int ret = 0;
-	    sending = true;
+	    //sending = true;
 	    synchronized(channel) {
 		try {
 		    int count = 0;
 		    while(pkt.hasRemaining()) {
 			long before = 0;
-			if (Parameters.measurePerf) {
-			    before = System.nanoTime();
-			}
 
 			int wrt = channel.write(pkt);
 
-			if (0 == wrt) {
-			    if (Parameters.measurePerf) {
-				Parameters.t1 += System.nanoTime() - before;
-			    }
-			}
 			/*
 			if (wrt == 0) {
 			    Selector selector = Selector.open();
@@ -115,6 +110,7 @@ public class openflow extends Driver {
 			*/			
 			count++;
 			if (count > 300000) {
+			    System.err.println("Too many tries for "+dpid);
 			    //return ret;
 			}
 			
@@ -155,6 +151,12 @@ public class openflow extends Driver {
 	    }
 	}
 
+	public Switch getSwitchAt(int idx) {
+	    if (idx >= pool.size())
+		return null;
+	    return pool.get(idx);
+	}
+
 	public Switch nextSwitch() {
 	    synchronized(pool) {
 		int size = pool.size();
@@ -189,7 +191,7 @@ public class openflow extends Driver {
 	}
     }
 	
-    private final static int BUFFERSIZE = 4096;
+    private final static int BUFFERSIZE = 1024;
 	
     private HashMap<Long, Switch> dpid2switch;
     private HashMap<SocketChannel, Switch> chnl2switch;
@@ -203,11 +205,9 @@ public class openflow extends Driver {
 	swRRPool = new SwitchRRPool(this);
     }
     
-    public int SendPktOut(long dpid, ByteBuffer pkt, int length) {
+    public int SendPktOut(long dpid, ByteBuffer pkt) {
 	Switch target;
-	synchronized(dpid2switch) {
-	    target = dpid2switch.get(dpid);
-	}
+	target = dpid2switch.get(dpid);
 	Utilities.Assert(target != null, "Cannot find target switch for dpid "+dpid);
 	return target.send(pkt);
     }
@@ -593,16 +593,23 @@ public class openflow extends Driver {
 	}
 	if (e instanceof PacketOutEvent) {
 	    int size = events.size();
-	    boolean ret = processToSpecificSwitchEvent(events);
-	    
-	    if (Parameters.am.dataLogMgr.enabled && ret) {
-		Parameters.am.dataLogMgr.addEntry(new LogContent(((PacketOutEvent)e).dpid, size));
+	    boolean ret = true;
+	    //if (((PacketOutEvent)e).send)
+	    ret = processToSpecificSwitchEvent(events);
+
+	    if (ret) {
+		Parameters.am.workerMgr.increaseCounter(size);
+		
+		if (Parameters.am.dataLogMgr.enabled) {
+		    Parameters.am.dataLogMgr.addEntry(new LogContent(((PacketOutEvent)e).dpid, size));
+		}
 	    }
 	    
 	    return ret;
 	}
 	if (e instanceof FlowModEvent) {
 	    return processToSpecificSwitchEvent(events);
+	    //return true;
 	}
 	return true;
     }
@@ -611,9 +618,11 @@ public class openflow extends Driver {
 	public LinkedList<Event> es = new LinkedList<Event>();
 	public int totalLength = 0;
 	public long dpid;
+	public Switch sw;
 		
 	public ByteBuffer toPacket() {
 	    ByteBuffer pkt = ByteBuffer.allocate(totalLength);
+	    
 	    int pos = 0;
 	    for (Event e : es) {
 		ToSpecificSwitchEvent tsse = (ToSpecificSwitchEvent)e;
@@ -629,6 +638,7 @@ public class openflow extends Driver {
 		    }
 		}
 	    }
+
 	    return pkt;
     	}
     }
@@ -640,11 +650,6 @@ public class openflow extends Driver {
     
 	
     private boolean processToSpecificSwitchEvent(LinkedList<Event> events) {
-	long before = 0;
-	if (Parameters.measurePerf) {
-	    before = System.nanoTime();
-	}
-		
 	// Assume that the dpids in "events" are the same
 	long dpid = ((ToSpecificSwitchEvent)events.getFirst()).dpid;
 	Switch target = dpid2switch.get(dpid);
@@ -655,6 +660,7 @@ public class openflow extends Driver {
 	
 	Partition pt = new Partition();
 	pt.dpid = dpid;
+	pt.sw = target;
 	for (Event e : events) {
 	    ToSpecificSwitchEvent tsse = (ToSpecificSwitchEvent)e;
 	    pt.totalLength += tsse.getLength();
@@ -695,6 +701,9 @@ public class openflow extends Driver {
 	    }
 	}
 	*/
+
+	target.sending = true;
+	
 	if (toRun) {
 	    /* For better paralizability of memory management,
 	     * we do not do partition consolidation
@@ -717,13 +726,13 @@ public class openflow extends Driver {
 	    */
 	    if (Parameters.batchOutput) {
 		ByteBuffer pkt = pt.toPacket();
-		SendPktOut(pt.dpid, pkt, pkt.array().length);
+		SendPktOut(pt.dpid, pkt);
 	    } else {
 		for (Event e : pt.es) {
 		    ToSpecificSwitchEvent tsse = (ToSpecificSwitchEvent)e;
 		    ByteBuffer pkt = ByteBuffer.allocate(tsse.getLength());
 		    tsse.convertToBytes(pkt.array(), 0);
-		    SendPktOut(tsse.dpid, pkt, pkt.array().length);
+		    SendPktOut(tsse.dpid, pkt);
 		    if (Parameters.useMemoryMgnt) {
 			if (tsse instanceof FlowModEvent) {
 			    Parameters.am.memMgr.freeFlowModEvent((FlowModEvent)tsse);
@@ -738,16 +747,14 @@ public class openflow extends Driver {
 	    pt.es.clear();
 	}
 
-	if (Parameters.measurePerf) {
-	    Parameters.t3 += System.nanoTime() - before;
-	}
 	return true;
     }
 	
     public void print() {
-	for (long i=1;i<=21;i++) {
+	for (long i=1;i<=60;i++) {
 	    Switch sw = dpid2switch.get(i);
-	    System.err.println("Switch # "+i+" chances "+sw.chances+" choptime "+sw.totalChopTime+" totalSize "+sw.totalSize);
+	    if (sw.totalSize > 0)
+		System.err.println("Switch # "+i+" chances "+sw.chances+" skipped "+sw.skipped+" totalSize "+sw.totalSize+" zeroes "+sw.zeroes);
 	}
     }
 
@@ -760,19 +767,72 @@ public class openflow extends Driver {
 
 	public void run() {
 	    ByteBuffer buffer = ByteBuffer.allocate(BUFFERSIZE);
+	    //ByteBuffer buffer = ByteBuffer.allocate(78*10);
 	    int voidRead = 0;
+	    int idx = 0;
+	    int trySkipped = 0;
+	    final int HOWMANYTRIES = 50;
+	    int toFlush = 0;
+	    final int WHENFLUSH = 4;
+	    LinkedList<Switch> skipped = new LinkedList<Switch>();
 	    while (true) {
-		Switch sw = of.getRRPool().nextSwitch();
-		if (null == sw)
-		    continue;
-
 		/*
+		Switch sw = of.getRRPool().nextSwitch();
+		if (null == sw) {
+		    continue;
+		}
+		*/
+
+		Switch sw = null;
+		if (idx < of.getRRPool().getSize()) {
+		    sw = of.getRRPool().getSwitchAt(idx++);
+		}
+		if (null == sw) {
+		    if (skipped.size() == 0) {
+			idx = 0;
+			if (++toFlush >= WHENFLUSH) {
+			    toFlush = 0;
+			    if (of.getRRPool().getSize() > 0) {
+				of.flush();
+			    }
+			}
+			trySkipped = 0;
+			continue;
+		    } else {
+			if (trySkipped < HOWMANYTRIES) {
+			    sw = skipped.removeFirst();
+			    trySkipped ++;
+			} else {
+			    skipped.clear();
+			    idx = 0;
+			    if (++toFlush >= WHENFLUSH) {
+				toFlush = 0;
+				if (of.getRRPool().getSize() > 0) {
+				    of.flush();
+				}
+			    }
+			    trySkipped = 0;
+			    continue;
+			}
+		    }
+		}
+
+		synchronized (sw) {
+		    if (sw.chopping) {
+			skipped.addLast(sw);
+			continue;
+		    }
+		    else
+			sw.chopping = true;
+		}
+		
+		
 		long before = 0;
 		if (Parameters.warmuped) {
 		    sw.chances ++;
-		    before = System.nanoTime();
+		    //before = System.nanoTime();
 		}
-		*/
+		
 		
 		try {
 		    buffer.clear();
@@ -782,23 +842,49 @@ public class openflow extends Driver {
 			handleLeftSwitch(sw);
 			continue;
 		    } else if (size == 0) {
+			if (Parameters.warmuped)
+			    sw.zeroes ++;
 			sw.chopping = false;
-			
+			/*
+			// Whether flush the batch if there is no pending requests left
 			voidRead ++;
 			if (voidRead > of.getRRPool().getSize()) {
 			    of.flush();
 			    voidRead = 0;
 			}
-			
+			*/
 			continue;
 		    }
 
 		    ArrayList<RawMessage> msgs = of.chopMessages(sw, buffer, size);
 		    sw.chopping = false;
-		    /*
-		    if (Parameters.warmuped && before != 0) {
-			sw.totalChopTime += System.nanoTime() - before;
+
+		    
+		    if (Parameters.warmuped) {
+			//sw.totalChopTime += System.nanoTime() - before;
 			sw.totalSize += size;
+		    }
+		    
+
+		    if (of.toprint && sw.dpid == 16 && sw.totalSize >= 80000000) {
+			of.print();
+			of.toprint = false;
+		    }
+
+		    /*
+		    class LogContent extends DataLogManager.Content {
+			public long dpid;
+			public int size;
+			public LogContent(long d, int s) {
+			    dpid = d;
+			    size = s;
+			}
+			public String toString() {
+			    return String.format("%d %d\n", dpid, size);
+			}
+		    }
+		    if (Parameters.am.dataLogMgr.enabled) {
+			Parameters.am.dataLogMgr.addEntry(new LogContent(sw.dpid, -size));
 		    }
 		    */
 
@@ -808,8 +894,6 @@ public class openflow extends Driver {
 		    voidRead = 0;
 		} catch (IOException e) {
 		    //e.printStackTrace();
-		    //. TODO: write logs in memory to disk here
-		    Parameters.am.dataLogMgr.dumpLogs();
 		    //of.print();
 		    handleLeftSwitch(sw);
 		}
@@ -819,10 +903,14 @@ public class openflow extends Driver {
 	public void handleLeftSwitch(Switch sw) {
 	    try {
 		sw.channel.close();
+		//Utilities.printlnDebug("Switch "+sw.dpid+" has left the network");
 	    } catch (IOException e) {
-		Utilities.printlnDebug("Switch "+sw.dpid+" has left the network");
+		
 	    }
 	    of.getRRPool().removeSwitch(sw);
+	    //. TODO: write logs in memory to disk here
+	    Parameters.am.dataLogMgr.dumpLogs();
+
 	    //. TODO: Generate a switch leave event
 	}
     }

@@ -55,12 +55,42 @@ public class WorkerManager {
 	    return ret.intValue();
     }
 
+    public long increaseCounter(long inc) {
+	int idx = getCurrentWorkerID();
+	if (idx == -1)
+	    return -1;
+	WorkerThread thread = threads.get(idx);
+	if (thread != null) {
+	    thread.counter += inc;
+	    return thread.counter;
+	} else {
+	    return -1;
+	}
+    }
+
+    public long getCounter(int which) {
+	WorkerThread thread = threads.get(which);
+	if (thread != null) {
+	    return thread.counter;
+	} else {
+	    return -1;
+	}
+    }
+
     private class WorkerThread extends Thread {
 	public int myID;
 	public Runnable task;
+
+	/**
+	   A counter that can be used for any purpose,
+	   currently for counting how many requests have been
+	   processed by this worker thread
+	*/
+	public long counter;
 	public WorkerThread(int id, Runnable r) {
 	    myID = id;
 	    task = r;
+	    counter = 0;
 	}
 		
 	public void run() {

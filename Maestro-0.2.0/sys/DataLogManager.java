@@ -30,7 +30,7 @@ import java.io.*;
  * @author Zheng Cai
  */
 public class DataLogManager {
-    public static final boolean enabled = false;
+    public static final boolean enabled = true;
     
     public static abstract class Content {
 	public abstract String toString();
@@ -76,6 +76,9 @@ public class DataLogManager {
     public void addEntry(Content c) {
 	if (!enabled)
 	    return;
+
+	if (!Parameters.warmuped)
+	    return;
 	
 	int idx = mgr.getCurrentWorkerID();
 	if (idx < 0)
@@ -93,10 +96,14 @@ public class DataLogManager {
 	class TmpNode implements Comparable {
 	    public Entry e;
 	    public int idx;
+	    public int pos;
+	    public ArrayList<Entry> log;
 	    
-	    public TmpNode(Entry entry, int index) {
+	    public TmpNode(Entry entry, int index, int position, ArrayList<Entry> l) {
 		e = entry;
 		idx = index;
+		pos = position;
+		log = l;
 	    }
 	    
 	    public int compareTo(Object o) {
@@ -122,15 +129,19 @@ public class DataLogManager {
 		PriorityQueue<TmpNode> current = new PriorityQueue<TmpNode>();
 		for (int i=0;i<logs.size();i++) {
 		    if (logs.get(i).size() > 0)
-			current.add(new TmpNode(logs.get(i).remove(0), i));
+			current.add(new TmpNode(logs.get(i).get(0), i, 1, logs.get(i)));
 		}
 	    
 		while (current.peek() != null) {
 		    TmpNode tmp = current.poll();
+		    if (tmp.e.content == null)
+			System.err.println("FAINT, get a null in "+tmp.idx);
 		    writer.write(tmp.e.time+" "+tmp.e.content.toString());
 		
-		    if (logs.get(tmp.idx).size() > 0) {
-			tmp.e = logs.get(tmp.idx).remove(0);
+		    if (tmp.pos < tmp.log.size()) {
+			tmp.e = tmp.log.get(tmp.pos++);
+			if (tmp.e == null)
+			    System.err.println("DAMN, get a null in "+tmp.idx);
 			current.add(tmp);
 		    }
 		}

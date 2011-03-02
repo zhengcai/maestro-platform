@@ -51,6 +51,7 @@ public class PacketOutEvent extends ToSpecificSwitchEvent implements Comparable<
 	public int actionsLen;
 	public Action[] actions;
 	public DataPayload data;
+	public boolean send = false;
 	
 	@Override
 	public int compareTo(PacketOutEvent o) {

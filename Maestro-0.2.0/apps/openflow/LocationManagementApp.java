@@ -64,26 +64,32 @@ public class LocationManagementApp extends App {
 	    if (Parameters.am.dataLogMgr.enabled && pi.reason == 1) {
 		if (!Parameters.warmuped) {
 		    Parameters.warmuped = true;
-		    Parameters.am.dataLogMgr.addEntry(new LogContent(pi.dpid, -1));
+		    //Parameters.am.dataLogMgr.addEntry(new LogContent(pi.dpid, -1));
 		}
 	    }
+	    /*
 	    if (Parameters.am.dataLogMgr.enabled && pi.reason == 2) {
 		if (!Parameters.changePeriod) {
 		    Parameters.changePeriod = true;
 		    Parameters.am.dataLogMgr.addEntry(new LogContent(pi.dpid, -2));
 		}
 	    }
+	    */
+	    //. Warning: Disable this buffer id thing in real release! This is only for experiment
+	    if (Parameters.warmuped)
+		pi.bufferId = 55;
+	    
 	    try {
 		//. Warning: currently each end host can only register once with Maestro
 		if (null == hosts.getHostLocation(pi.flow.dlSrc)) {
 		    hosts.acquireWrite();
 		    hosts.addHostLocation(pi.flow.dlSrc, new RegisteredHostsView.Location(pi.dpid, pi.inPort));
-		    
+		    /*
 		    Utilities.printlnDebug("Registering "+String.format("MAC %d-%d-%d-%d-%d-%d",
 									pi.flow.dlSrc[0], pi.flow.dlSrc[1], pi.flow.dlSrc[2],
 									pi.flow.dlSrc[3], pi.flow.dlSrc[4], pi.flow.dlSrc[5])
 					   +" at "+pi.dpid+" ("+pi.inPort+")");
-		    
+		    */
 		    hosts.releaseWrite();
 		}
 	    } catch (NullPointerException e) {

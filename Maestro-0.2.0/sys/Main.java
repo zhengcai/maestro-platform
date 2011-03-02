@@ -65,6 +65,8 @@ public class Main {
 		    Parameters.dataLogFile = words[1];
 		} else if (words[0].compareToIgnoreCase("port") == 0) {
 		    Parameters.listenPort = Integer.parseInt(words[1]);
+		} else if (words[0].compareToIgnoreCase("daemonPort") == 0) {
+		    Parameters.daemonPort = Integer.parseInt(words[1]);
 		} else {
 		    
 		}
@@ -96,13 +98,18 @@ public class Main {
 	System.out.println(trie.getEntry(mac3));
 	*/
 	if (args.length != 3) {
-	    System.err.println("Usage: parameter-configuration-file dag-file runConsole");
+	    System.err.println("Usage: parameter-configuration-file dag-file consoleMode");
 	    System.exit(0);
 	}
     	Thread.currentThread().setName("Main thread");
     	readConfiguration(args[0]);
+	if (args[2].compareToIgnoreCase("interactive") == 0)
+	    Parameters.consoleMode = CmdConsole.INTERACTIVE;
+	else if (args[2].compareToIgnoreCase("daemon") == 0)
+	    Parameters.consoleMode = CmdConsole.DAEMON;
+	else
+	    Parameters.consoleMode = Integer.parseInt(args[2]);
     	ApplicationManager am = new ApplicationManager(args[1]);
-	Parameters.runConsole = (1 == Integer.parseInt(args[2]))?true:false;
     	Parameters.am = am;
     	am.run();
     }
