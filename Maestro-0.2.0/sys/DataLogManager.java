@@ -30,7 +30,7 @@ import java.io.*;
  * @author Zheng Cai
  */
 public class DataLogManager {
-    public static final boolean enabled = true;
+    public static final boolean enabled = false;
     
     public static abstract class Content {
 	public abstract String toString();

@@ -98,12 +98,17 @@ public class CmdConsole extends Thread {
 				continue;
 			    }
 
+			    String request = new String(buffer.array(), 0, size);
 			    buffer.clear();
-			    for (int i=0;i<Parameters.divide;i++) {
-				buffer.put(String.format("Worker %d counter %d\n", i, appManager.workerMgr.getCounter(i)).getBytes());;
+			    String[] fields = request.split(" ");
+			    if (fields[0].compareToIgnoreCase("GET") == 0) {
+				if (fields[1].compareToIgnoreCase("SYSTEM") == 0)
+				    prepareSystemPage(buffer);
+				if (fields[1].compareToIgnoreCase("DRIVER") == 0)
+				    viewManager.driver.prepareDriverPage(buffer);
+				
+				size = channel.write(buffer);
 			    }
-			    buffer.flip();
-			    size = channel.write(buffer);
 			}
 		    } catch (IOException e) {
 			e.printStackTrace();
@@ -115,6 +120,19 @@ public class CmdConsole extends Thread {
 	} catch (IOException e) {
 	    e.printStackTrace();
 	}
+    }
+
+    public void prepareSystemPage(ByteBuffer buffer) {
+	Runtime runtime = Runtime.getRuntime();
+	buffer.put(String.format("SYSTEM\n").getBytes());
+	buffer.put(String.format("SystemTime %d\n", System.nanoTime()).getBytes());
+	buffer.put(String.format("NumThreads %d\n", Parameters.divide).getBytes());
+	buffer.put(String.format("FreeMemory %d\n", runtime.freeMemory()).getBytes());
+	buffer.put(String.format("TotalMemory %d\n", runtime.totalMemory()).getBytes());
+	for (int i=0;i<Parameters.divide;i++) {
+	    buffer.put(String.format("Worker %d Counter %d\n", i, appManager.workerMgr.getCounter(i)).getBytes());
+	}
+	buffer.flip();
     }
 
     public void interactive() {

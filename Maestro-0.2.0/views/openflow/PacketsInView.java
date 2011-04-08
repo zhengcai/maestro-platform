@@ -49,38 +49,25 @@ public class PacketsInView extends View {
 
     @Override
 	public boolean processEvent(Event e) {
+
 	if (!(e instanceof PacketInEvent)) {
 	    return false;
 	}
 
-	//. Currently consider flush PacketInEvent to be invalid dummy event
+	if (!((PacketInEvent)e).dummy)
+	    incoming.addLast((PacketInEvent)e);
+
 	if (((PacketInEvent)e).flush) {
 	    return incoming.size() > 0;
 	}
 
-	incoming.addLast((PacketInEvent)e);
+	return false;
 
+	/*
 	if (incoming.size() >= Parameters.batchInputNum) {
 	    return true;
 	} else {
 	    return false;
-	}
-	
-	/*
-	synchronized(incoming) {
-	    incoming.addLast((PacketInEvent)e);
-		
-	    if (incoming.size() >= Parameters.batchInputNum) {
-		synchronized (queues) {
-		    LinkedList<PacketInEvent> toAdd = new LinkedList<PacketInEvent>();
-		    toAdd.addAll(incoming);
-		    queues.addLast(toAdd);
-		}
-		incoming.clear();
-		return true;
-	    } else {
-		return false;
-	    }
 	}
 	*/
     }

@@ -112,6 +112,11 @@ public class DAGRuntime {
      */
     public void start(ApplicationManager am) {
 	/*
+	if (Parameters.am.workerMgr.getCurrentWorkerID() == 1) {
+	    System.err.println("Starting DAG");
+	}
+	*/
+	/*
 	if (finished)
 	    return;
 	*/

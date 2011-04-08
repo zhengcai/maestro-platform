@@ -29,6 +29,7 @@ import drivers.Driver;
 import events.Event;
 import events.openflow.PacketOutEvent;
 import views.View;
+import sys.Parameters;
 
 /**
  * Contains a number of PacketOutEvent
@@ -52,8 +53,10 @@ public class PacketsOutView extends View {
 
     @Override
 	public void commit(Driver driver) {
+	int size = 0;
 	ArrayList<LinkedList<Event>> remaining = new ArrayList<LinkedList<Event>>();
 	for (LinkedList<Event> events : pkts.values()) {
+	    size += events.size();
 	    if (!driver.commitEvent(events))
 		remaining.add(events);
 	    //events.clear();
@@ -63,6 +66,11 @@ public class PacketsOutView extends View {
 	    while (!driver.commitEvent(events));
 	}
 	remaining.clear();
+	/*
+	if (Parameters.am.workerMgr.getCurrentWorkerID() == 1) {
+	    System.err.println("Finishing DAG "+size);
+	}
+	*/
     }
 
     @Override

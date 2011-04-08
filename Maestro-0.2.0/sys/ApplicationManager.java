@@ -103,10 +103,8 @@ public class ApplicationManager extends Thread {
 	dataLogMgr = new DataLogManager(workerMgr);
 	dataLogMgr.addLogs(Parameters.divide);
 
-	for (int i = 0; i < Parameters.divide; i++) {
-	    workerMgr.addThread(vm.driver.newTask());
-	}
 
+	
 	if (Parameters.useMemoryMgnt) {
 	    memMgr = new MemoryManager();
 	}
@@ -119,6 +117,9 @@ public class ApplicationManager extends Thread {
      * should probably think about adding this feature later.
      */
     public void run() {
+	for (int i = 0; i < Parameters.divide; i++) {
+	    workerMgr.addThread(vm.driver.newTask());
+	}
 	updateTriggerMap();
 	vm.startDriver();
     }

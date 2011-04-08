@@ -29,6 +29,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.LinkedList;
 import java.util.ArrayList;
 import java.util.Random;
@@ -69,9 +70,10 @@ public class openflow extends Driver {
 
 	public int chances = 0;
 	public int skipped = 0;
-	public long totalChopTime = 0;
 	public int totalSize = 0;
 	public int zeroes = 0;
+
+	public long totalProcessed = 0;
 		
 	/** For those lldps received before the dpid of this switch is known */
 	private LinkedList<LLDPPacketInEvent> lldpQueue;
@@ -83,7 +85,7 @@ public class openflow extends Driver {
 
 	public int send(ByteBuffer pkt) {
 	    int ret = 0;
-	    //sending = true;
+	    sending = true;
 	    synchronized(channel) {
 		try {
 		    int count = 0;
@@ -111,7 +113,7 @@ public class openflow extends Driver {
 			count++;
 			if (count > 300000) {
 			    System.err.println("Too many tries for "+dpid);
-			    //return ret;
+			    return ret;
 			}
 			
 		    }
@@ -347,8 +349,11 @@ public class openflow extends Driver {
 	}
 	return ret;
     }
-    
-    public void dispatchPacket(Switch sw, byte[] buffer, int pos, int size) {
+
+    /**
+      @return whether this packet is a PacketIn
+    */
+    public boolean dispatchPacket(Switch sw, byte[] buffer, int pos, int size, boolean flush) {
     	
     	short type = Utilities.getNetworkBytesUint8(buffer, pos+1);
 	int length = Utilities.getNetworkBytesUint16(buffer, pos+2);
@@ -373,11 +378,12 @@ public class openflow extends Driver {
 	    handleFeaturesReply(sw, buffer, pos, length);
 	    break;
 	case OFPConstants.PacketTypes.OFPT_PACKET_IN:
-	    handlePacketIn(sw, buffer, pos, length);
-	    break;
+	    return handlePacketIn(sw, buffer, pos, length, flush);
+	    //break;
 	default:
 	    break;
 	}
+	return false;
     }
     
     public void handleFeaturesReply(Switch sw, byte[] buffer, int pos, int length) {
@@ -388,7 +394,7 @@ public class openflow extends Driver {
     	sw.dpid = sj.dpid;
     	synchronized(dpid2switch) {
 	    dpid2switch.put(sw.dpid, sw);
-    	}
+	}
     	
     	sj.nBuffers = Utilities.getNetworkBytesUint32(buffer, pos);
     	pos += 4;
@@ -441,13 +447,14 @@ public class openflow extends Driver {
     	}
     }
 
-    public void handlePacketIn(Switch sw, byte[] buffer, int pos, int length) {
+    public boolean handlePacketIn(Switch sw, byte[] buffer, int pos, int length, boolean flush) {
 	PacketInEvent pi;
 	if (Parameters.useMemoryMgnt) {
 	    pi = Parameters.am.memMgr.allocPacketInEvent();
 	} else {
 	    pi = new PacketInEvent();
 	}
+	pi.flush = flush;
     	
     	pi.xid = Utilities.getNetworkBytesUint32(buffer, pos+4);
     	pos += OFPConstants.OfpConstants.OFP_HEADER_LEN;
@@ -498,7 +505,7 @@ public class openflow extends Driver {
 	    LLDPPacketInEvent lldp = new LLDPPacketInEvent();
 	    if(!(eth.inner instanceof LLDPHeader)) {
 		Utilities.printlnDebug("The LLDP packet is not correctly formated");
-		return;
+		return false;
 	    }
 	    LLDPHeader lldpHeader = (LLDPHeader)eth.inner;
 	    lldp.srcDpid = Utilities.getNetworkBytesUint64(lldpHeader.chassisId.value, 0);
@@ -514,6 +521,7 @@ public class openflow extends Driver {
 	    } else {
 		vm.postEvent(lldp);
 	    }
+	    return false;
 	} else {
 	    if (Parameters.divide > 0) {
 		int toWhich = Parameters.am.workerMgr.getCurrentWorkerID();
@@ -521,6 +529,7 @@ public class openflow extends Driver {
 	    } else {
 		vm.postEvent(pi);
 	    }
+	    return true;
 	}
     }
 
@@ -536,6 +545,7 @@ public class openflow extends Driver {
 	    pi = new PacketInEvent();
 	}
 	pi.flush = true;
+	pi.dummy = true;
 	if (Parameters.divide > 0) {
 	    int toWhich = Parameters.am.workerMgr.getCurrentWorkerID();
 	    vm.postEventConcurrent(pi, toWhich);
@@ -702,8 +712,6 @@ public class openflow extends Driver {
 	}
 	*/
 
-	target.sending = true;
-	
 	if (toRun) {
 	    /* For better paralizability of memory management,
 	     * we do not do partition consolidation
@@ -724,6 +732,9 @@ public class openflow extends Driver {
 	    of.pendingPts.remove(pt.dpid);
 	    }
 	    */
+	    if ( pt.es.getFirst() instanceof PacketOutEvent)
+		target.totalProcessed += pt.es.size();
+	    
 	    if (Parameters.batchOutput) {
 		ByteBuffer pkt = pt.toPacket();
 		SendPktOut(pt.dpid, pkt);
@@ -754,7 +765,7 @@ public class openflow extends Driver {
 	for (long i=1;i<=60;i++) {
 	    Switch sw = dpid2switch.get(i);
 	    if (sw.totalSize > 0)
-		System.err.println("Switch # "+i+" chances "+sw.chances+" skipped "+sw.skipped+" totalSize "+sw.totalSize+" zeroes "+sw.zeroes);
+		System.err.println("Switch # "+i+" chances "+sw.chances+" processed "+sw.totalProcessed+" totalSize "+sw.totalSize+" zeroes "+sw.zeroes);
 	}
     }
 
@@ -766,14 +777,28 @@ public class openflow extends Driver {
 	}
 
 	public void run() {
+	    int workerID = Parameters.am.workerMgr.getCurrentWorkerID();
 	    ByteBuffer buffer = ByteBuffer.allocate(BUFFERSIZE);
-	    //ByteBuffer buffer = ByteBuffer.allocate(78*10);
+	    //ByteBuffer buffer = ByteBuffer.allocate(78*30);
 	    int voidRead = 0;
 	    int idx = 0;
 	    int trySkipped = 0;
-	    final int HOWMANYTRIES = 50;
-	    int toFlush = 0;
-	    final int WHENFLUSH = 4;
+	    final int HOWMANYTRIES = 40;
+	    int ibt = Parameters.batchInputNum;
+	    int maxIbt = Parameters.batchInputNum;
+	    final int step = 100;
+	    boolean congested = false;
+	    boolean increasing = true;
+	    int batched = 0;
+	    long begin = 0, finish = 0;
+	    long lastLatency = 0;
+	    long lastLast = 0;
+	    int printFreq = 0;
+	    int count = 0;
+	    final int MaxSteps = 100; //. Maximum IBT is MaxSteps*step
+	    final int HistoryWeight = 80; //. History value weighs 80%
+	    long[] history = new long[MaxSteps];
+
 	    LinkedList<Switch> skipped = new LinkedList<Switch>();
 	    while (true) {
 		/*
@@ -788,32 +813,14 @@ public class openflow extends Driver {
 		    sw = of.getRRPool().getSwitchAt(idx++);
 		}
 		if (null == sw) {
-		    if (skipped.size() == 0) {
+		    if (skipped.size() == 0 || trySkipped >= HOWMANYTRIES) {
+			skipped.clear();
 			idx = 0;
-			if (++toFlush >= WHENFLUSH) {
-			    toFlush = 0;
-			    if (of.getRRPool().getSize() > 0) {
-				of.flush();
-			    }
-			}
 			trySkipped = 0;
 			continue;
 		    } else {
-			if (trySkipped < HOWMANYTRIES) {
-			    sw = skipped.removeFirst();
-			    trySkipped ++;
-			} else {
-			    skipped.clear();
-			    idx = 0;
-			    if (++toFlush >= WHENFLUSH) {
-				toFlush = 0;
-				if (of.getRRPool().getSize() > 0) {
-				    of.flush();
-				}
-			    }
-			    trySkipped = 0;
-			    continue;
-			}
+			sw = skipped.removeFirst();
+			trySkipped ++;
 		    }
 		}
 
@@ -826,13 +833,11 @@ public class openflow extends Driver {
 			sw.chopping = true;
 		}
 		
-		
 		long before = 0;
 		if (Parameters.warmuped) {
 		    sw.chances ++;
 		    //before = System.nanoTime();
 		}
-		
 		
 		try {
 		    buffer.clear();
@@ -845,52 +850,85 @@ public class openflow extends Driver {
 			if (Parameters.warmuped)
 			    sw.zeroes ++;
 			sw.chopping = false;
-			/*
 			// Whether flush the batch if there is no pending requests left
 			voidRead ++;
 			if (voidRead > of.getRRPool().getSize()) {
 			    of.flush();
 			    voidRead = 0;
+			    batched = 0;
+			    increasing = false;
+			    congested = false;
 			}
-			*/
 			continue;
+		    } else if (size == BUFFERSIZE) {
+			congested = true;
 		    }
 
 		    ArrayList<RawMessage> msgs = of.chopMessages(sw, buffer, size);
 		    sw.chopping = false;
-
 		    
 		    if (Parameters.warmuped) {
-			//sw.totalChopTime += System.nanoTime() - before;
 			sw.totalSize += size;
 		    }
-		    
 
-		    if (of.toprint && sw.dpid == 16 && sw.totalSize >= 80000000) {
+		    if (of.toprint && sw.dpid == 60 && sw.totalSize >= 80000000) {
 			of.print();
 			of.toprint = false;
 		    }
 
-		    /*
-		    class LogContent extends DataLogManager.Content {
-			public long dpid;
-			public int size;
-			public LogContent(long d, int s) {
-			    dpid = d;
-			    size = s;
-			}
-			public String toString() {
-			    return String.format("%d %d\n", dpid, size);
-			}
-		    }
-		    if (Parameters.am.dataLogMgr.enabled) {
-			Parameters.am.dataLogMgr.addEntry(new LogContent(sw.dpid, -size));
-		    }
-		    */
-
 		    for (RawMessage msg : msgs) {
-			of.dispatchPacket(sw, msg.buf, msg.start, msg.length);
+			if (batched >= ibt) {
+			    if (of.dispatchPacket(sw, msg.buf, msg.start, msg.length, true)) {
+				
+				long allTime = System.nanoTime() - begin;
+				long latency = allTime / batched + allTime / 2000; //. Average latency for each request
+
+				
+				long realLa = latency;
+				
+				//. Adding history into the evaluation
+				int hisIdx = ibt / step;
+				if (history[hisIdx] == 0) {
+				    history[hisIdx] = latency;
+				} else {
+				    latency = (latency*(100-HistoryWeight) + history[hisIdx]*HistoryWeight) / 100;
+				    history[hisIdx] = latency;
+				}
+				
+				
+				if (workerID == 1) {
+				    System.err.println((count++)+" "+ibt+" "+increasing+" "+latency+" ("+realLa+") "+lastLatency+" "+allTime);
+				}
+				
+				if (latency < lastLatency) { //. Better
+				    if (increasing && congested) {
+					ibt += step;
+					if (ibt > maxIbt)
+					    maxIbt = ibt;
+				    } else {
+					if (ibt <= step)
+					    ibt = step;
+					else
+					    ibt -= step;
+				    }
+				} else { //. Worse
+				    increasing = !increasing;
+				}
+
+				lastLast = lastLatency;
+				lastLatency = latency;
+				congested = false;
+				
+				batched = 0;
+			    }
+			} else {
+			    batched += of.dispatchPacket(sw, msg.buf, msg.start, msg.length, false) ? 1 : 0;
+			    if (batched == 1) {
+				begin = System.nanoTime();
+			    }
+			}
 		    }
+		    
 		    voidRead = 0;
 		} catch (IOException e) {
 		    //e.printStackTrace();
@@ -917,5 +955,17 @@ public class openflow extends Driver {
     
     public Runnable newTask() {
 	return new OpenFlowTask(this);
+    }
+
+    public void prepareDriverPage(ByteBuffer buffer) {
+	buffer.put(String.format("DRIVER\n").getBytes());
+	buffer.put(String.format("SystemTime %d\n", System.nanoTime()).getBytes());
+	buffer.put(String.format("TotalSwitches %d\n", dpid2switch.size()).getBytes());
+	synchronized(dpid2switch) {
+	    for (Switch sw : dpid2switch.values()) {
+		buffer.put(String.format("Switch %d Processed %d\n", sw.dpid, sw.totalProcessed).getBytes());
+	    }
+	}
+	buffer.flip();
     }
 }
