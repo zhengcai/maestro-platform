@@ -36,9 +36,11 @@ import views.View;
  */
 public class FlowConfigView extends View {
     public HashMap<Long, ArrayList<Event>> configs;
+    private ArrayList<ArrayList<Event>> remaining;
 	
     public FlowConfigView() {
 	configs = new HashMap<Long, ArrayList<Event>>();
+	remaining = new ArrayList<ArrayList<Event>>();
     }
 	
     public void addFlowModEvent(FlowModEvent fm) {
@@ -52,12 +54,13 @@ public class FlowConfigView extends View {
 
     @Override
 	public void commit(Driver driver) {
-	ArrayList<ArrayList<Event>> remaining = new ArrayList<ArrayList<Event>>();
 	for (ArrayList<Event> events : configs.values()) {
-	    if (!driver.commitEvent(events))
-		remaining.add(events);
+	    if (events.size() > 0)
+		if (!driver.commitEvent(events))
+		    remaining.add(events);
 	}
-	configs.clear();
+	//configs.clear();
+	
 	for (ArrayList<Event> events : remaining) {
 	    while (!driver.commitEvent(events));
 	}

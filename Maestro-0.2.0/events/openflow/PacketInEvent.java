@@ -23,6 +23,7 @@ package events.openflow;
 import drivers.OFPConstants;
 import events.Event;
 import events.MemoryPoolEvent;
+import views.openflow.RegisteredHostsView;
 import headers.*;
 
 /**
@@ -142,6 +143,7 @@ public class PacketInEvent extends MemoryPoolEvent {
     public DataPayload data;
     public FlowInfo flow;
     public EthernetHeader header; //. Assume all packets are ethernet frames
+    public RegisteredHostsView.Location dst;
     public boolean flush = false; //. Whether to flush the input batching queue
     public boolean dummy = false; //. Whether this is a dummy packet
 

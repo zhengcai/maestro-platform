@@ -44,22 +44,20 @@ public class RouteFlowApp extends App {
 	public ViewsIOBucket process(ViewsIOBucket input) {
 	JoinedSwitchesView sws = (JoinedSwitchesView)input.getView(0);
 	RoutingIntraView rt = (RoutingIntraView)input.getView(1);
-	FlowsInView fis = (FlowsInView)input.getView(2);
-
-	FlowConfigView config = new FlowConfigView();
-	PacketsOutView pkts = new PacketsOutView();
-	for (FlowsInView.FlowIn fl : fis.queue) {
-	    //addPacketOut(fl.pi, OFPConstants.OfpPort.OFPP_FLOOD, pkts);
-	    
+	PacketsInView pis = (PacketsInView)input.getView(2);
+	FlowConfigView config = (FlowConfigView)input.getView(3);
+	PacketsOutView pkts = (PacketsOutView)input.getView(4);
+	
+	for (PacketInEvent pi : pis.incoming) {
 	    //. This is a broadcast packet, send it out to OFPP_FLOOD
-	    if (fl.dst == RegisteredHostsView.MAC_Broad_Cast) {
-		config.addFlowModEvent(createFlowModAdd(fl.pi, fl.pi.dpid, OFPConstants.OfpPort.OFPP_FLOOD));
-		addPacketOut(fl.pi, OFPConstants.OfpPort.OFPP_FLOOD, pkts);
-	    } else if (fl.dst == RegisteredHostsView.Location_Unknown) {
-		addPacketOut(fl.pi, OFPConstants.OfpPort.OFPP_FLOOD, pkts);
+	    if (pi.dst == RegisteredHostsView.MAC_Broad_Cast) {
+		config.addFlowModEvent(createFlowModAdd(pi, pi.dpid, OFPConstants.OfpPort.OFPP_FLOOD));
+		addPacketOut(pi, OFPConstants.OfpPort.OFPP_FLOOD, pkts);
+	    } else if (pi.dst == RegisteredHostsView.Location_Unknown) {
+		addPacketOut(pi, OFPConstants.OfpPort.OFPP_FLOOD, pkts);
 	    } else { //. Regular packet
-		long from = fl.pi.dpid;
-		long to = fl.dst.dpid;
+		long from = pi.dpid;
+		long to = pi.dst.dpid;
 		RoutingIntraView.Route rtv = rt.getNextHop(from, to);
 		long current = from;
 		if (rtv == null) {
@@ -67,20 +65,20 @@ public class RouteFlowApp extends App {
 		    //. Otherwise it is still in transient state
 		    if (from == to) {
 			//. Make sure the inport and outport are different
-			if (fl.pi.inPort != fl.dst.port) {
+			if (pi.inPort != pi.dst.port) {
 			    //. Add the flow entry
-			    config.addFlowModEvent(createFlowModAdd(fl.pi, from, fl.dst.port));
-			    addPacketOut(fl.pi, fl.dst.port, pkts);
+			    config.addFlowModEvent(createFlowModAdd(pi, from, pi.dst.port));
+			    addPacketOut(pi, pi.dst.port, pkts);
 			}
 		    }
 		    continue;
 		}
 			
-		addPacketOut(fl.pi, rtv.port, pkts);
+		addPacketOut(pi, rtv.port, pkts);
 			
 		long next = rtv.next;
 		while (current != to) {
-		    config.addFlowModEvent(createFlowModAdd(fl.pi, current, rtv.port));
+		    config.addFlowModEvent(createFlowModAdd(pi, current, rtv.port));
 		    rtv = rt.getNextHop(next, to);
 		    //. Still in transient state
 		    if (rtv == null) {
@@ -91,9 +89,10 @@ public class RouteFlowApp extends App {
 		}
 	    }
 	    if (Parameters.useMemoryMgnt) {
-		Parameters.am.memMgr.freePacketInEvent(fl.pi);
+		Parameters.am.memMgr.freePacketInEvent(pi);
 	    }
 	}
+	pis.incoming.clear();
 		
 	ViewsIOBucket output = new ViewsIOBucket();
 	output.addView(0, config);

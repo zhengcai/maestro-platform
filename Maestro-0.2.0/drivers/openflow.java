@@ -113,6 +113,7 @@ public class openflow extends Driver {
 			count++;
 			if (count > 300000) {
 			    System.err.println("Too many tries for "+dpid);
+			    sending = false;
 			    return ret;
 			}
 			
@@ -592,7 +593,7 @@ public class openflow extends Driver {
     @Override
 	public boolean commitEvent(ArrayList<Event> events) {
 	if (events.size() == 0) {
-	    return false;
+	    return true;
 	}
 	Event e = events.get(0);
 	if (e == null) {
@@ -760,6 +761,7 @@ public class openflow extends Driver {
 		    }
 		}
 	    }
+	    
 	    pt.es.clear();
 	}
 
@@ -801,7 +803,7 @@ public class openflow extends Driver {
 	    int count = 0;
 	    final int MaxSteps = 100; //. Maximum IBT is MaxSteps*step
 	    final int HistoryWeight = 80; //. History value weighs 80%
-	    final long MaxDelay = 10000; //. MicroSecond
+	    final long MaxDelay = 50000; //. MicroSecond
 	    double[] history = new double[MaxSteps];
 
 	    LinkedList<Switch> skipped = new LinkedList<Switch>();
@@ -902,11 +904,13 @@ public class openflow extends Driver {
 				
 				if (workerID == 1) {
 				    //System.err.println((count++)+" "+ibt+" "+increasing+" "+score+" ("+realScore+") "+lastScore+" "+allTime);
+				    /*
 				    System.err.println(Parameters.newCountfm+" "+
 						       Parameters.newCountpi+" "+
 						       Parameters.newCountpo+" "+
 						       Parameters.newCountdata+" "+
 						       Parameters.newCountbuffer);
+				    */
 				}
 				
 				if (score > lastScore) { //. Better

@@ -7,7 +7,8 @@ Views
   ConnectivityLocalView conn_local
   RoutingIntraView routing_intra
   PacketsInView packets_in Concurrent
-  PacketsOutView packets_out
+  PacketsOutView packets_out Concurrent
+  FlowConfigView flow_config Concurrent
   ReceivedLLDPPacketsView lldps
   RegisteredHostsView hosts
 End Views
@@ -58,13 +59,15 @@ Begin DAG
     Input PacketsInView packets_in
     Input JoinedSwitchesView switches
     Input RegisteredHostsView hosts
-    Output FlowsInView flows_in
+    Output PacketsInView packets_in
     Output RegisteredHostsView hosts
   End Node
   Node n2 RouteFlowApp
     Input JoinedSwitchesView switches
     Input RoutingIntraView routing_intra
-    Input FlowsInView flows_in
+    Input PacketsInView packets_in
+    Input FlowConfigView flow_config
+    Input PacketsOutView packets_out
     Output FlowConfigView flow_config
     Output PacketsOutView packets_out
   End Node

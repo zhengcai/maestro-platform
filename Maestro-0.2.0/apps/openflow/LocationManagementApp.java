@@ -45,7 +45,7 @@ public class LocationManagementApp extends App {
 	JoinedSwitchesView sws = (JoinedSwitchesView)input.getView(1);
 	RegisteredHostsView hosts = (RegisteredHostsView)input.getView(2);
 
-	FlowsInView fis = new FlowsInView();
+	//FlowsInView fis = new FlowsInView();
 		
 	ArrayList<PacketInEvent> work = pis.incoming;
 		
@@ -98,9 +98,11 @@ public class LocationManagementApp extends App {
 	    RegisteredHostsView.Location dst = hosts.getHostLocation(pi.flow.dlDst);
 	    if (null == dst) {
 		if (Utilities.whetherMACBroadCast(pi.flow.dlDst)) {
-		    fis.queue.add(new FlowsInView.FlowIn(pi, RegisteredHostsView.MAC_Broad_Cast));
+		    //fis.queue.add(new FlowsInView.FlowIn(pi, RegisteredHostsView.MAC_Broad_Cast));
+		    pi.dst = RegisteredHostsView.MAC_Broad_Cast;
 		} else {
-		    fis.queue.add(new FlowsInView.FlowIn(pi, RegisteredHostsView.Location_Unknown));
+		    //fis.queue.add(new FlowsInView.FlowIn(pi, RegisteredHostsView.Location_Unknown));
+		    pi.dst = RegisteredHostsView.Location_Unknown;
 		}
 	    } else {
 		//. The registered switch has already left
@@ -108,16 +110,19 @@ public class LocationManagementApp extends App {
 		    hosts.acquireWrite();
 		    hosts.removeHostLocation(pi.flow.dlDst);
 		    hosts.releaseWrite();
-		    fis.queue.add(new FlowsInView.FlowIn(pi, RegisteredHostsView.Location_Unknown));
-		} else
-		    fis.queue.add(new FlowsInView.FlowIn(pi, dst));
+		    //fis.queue.add(new FlowsInView.FlowIn(pi, RegisteredHostsView.Location_Unknown));
+		    pi.dst = RegisteredHostsView.Location_Unknown;
+		} else {
+		    //fis.queue.add(new FlowsInView.FlowIn(pi, dst));
+		    pi.dst = dst;
+		}
 	    }
 	}
 
-	work.clear();
+	//work.clear();
 		
 	ViewsIOBucket output = new ViewsIOBucket();
-	output.addView(0, fis);
+	output.addView(0, pis);
 	output.addView(1, hosts);
 	return output;
     }

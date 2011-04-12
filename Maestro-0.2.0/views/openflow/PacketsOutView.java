@@ -37,9 +37,11 @@ import sys.Parameters;
  */
 public class PacketsOutView extends View {
     public HashMap<Long, ArrayList<Event>> pkts;
+    private ArrayList<ArrayList<Event>> remaining;
 	
     public PacketsOutView() {
 	pkts = new HashMap<Long, ArrayList<Event>>();
+	remaining = new ArrayList<ArrayList<Event>>();
     }
 	
     public void addPacketOutEvent(PacketOutEvent po) {
@@ -53,25 +55,17 @@ public class PacketsOutView extends View {
 
     @Override
 	public void commit(Driver driver) {
-	int size = 0;
-	ArrayList<ArrayList<Event>> remaining = new ArrayList<ArrayList<Event>>();
 	for (ArrayList<Event> events : pkts.values()) {
-	    size += events.size();
-	    size += events.size();
-	    if (!driver.commitEvent(events))
-		remaining.add(events);
-	    //events.clear();
+	    if (events.size() > 0)
+		if (!driver.commitEvent(events))
+		    remaining.add(events);
 	}
-	pkts.clear();
+	//pkts.clear();
+	
 	for (ArrayList<Event> events : remaining) {
 	    while (!driver.commitEvent(events));
 	}
 	remaining.clear();
-	/*
-	if (Parameters.am.workerMgr.getCurrentWorkerID() == 1) {
-	    System.err.println("Finishing DAG "+size);
-	}
-	*/
     }
 
     @Override
