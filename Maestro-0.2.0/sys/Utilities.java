@@ -431,7 +431,7 @@ public class Utilities {
 	    Utilities.ForceExit(0);
 	}
 	if ((dst.length - dpos) < length) {
-	    Utilities.printlnDebug("Dst out of boundary when copying bytes");
+	    Utilities.printlnDebug("Dst out of boundary when copying bytes, length is "+length+" while dst is "+dst.length+" pos "+dpos);
 	    Utilities.ForceExit(0);
 	}
 	for (int i=0;i<length;i++)

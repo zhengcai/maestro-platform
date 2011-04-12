@@ -54,6 +54,13 @@ public class Parameters {
     public static MyLong ran = new MyLong((long)0);
 	
     public static boolean measurePerf = false;
+
+    public static long newCountfm = 0;
+    public static long newCountpi = 0;
+    public static long freeCountpi = 0;
+    public static long newCountpo = 0;
+    public static long newCountdata = 0;
+    public static long newCountbuffer = 0;
     
     public static long t1 = 0;
     public static long t2 = 0;
@@ -75,7 +82,7 @@ public class Parameters {
     
     public static int maxWaitingDAGIns = 20;
     
-    public static boolean useMemoryMgnt = false;
+    public static boolean useMemoryMgnt = true;
     public static boolean warmuped = false;
     public static boolean changePeriod = false;
     public static int numPorts = 0;

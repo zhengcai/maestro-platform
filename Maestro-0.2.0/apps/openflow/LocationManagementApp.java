@@ -20,7 +20,7 @@
 
 package apps.openflow;
 
-import java.util.LinkedList;
+import java.util.*;
 
 import events.openflow.PacketInEvent;
 import sys.Parameters;
@@ -47,7 +47,7 @@ public class LocationManagementApp extends App {
 
 	FlowsInView fis = new FlowsInView();
 		
-	LinkedList<PacketInEvent> work = pis.incoming;
+	ArrayList<PacketInEvent> work = pis.incoming;
 		
 	for (PacketInEvent pi : work) {
 	    class LogContent extends DataLogManager.Content {
@@ -98,9 +98,9 @@ public class LocationManagementApp extends App {
 	    RegisteredHostsView.Location dst = hosts.getHostLocation(pi.flow.dlDst);
 	    if (null == dst) {
 		if (Utilities.whetherMACBroadCast(pi.flow.dlDst)) {
-		    fis.queue.addLast(new FlowsInView.FlowIn(pi, RegisteredHostsView.MAC_Broad_Cast));
+		    fis.queue.add(new FlowsInView.FlowIn(pi, RegisteredHostsView.MAC_Broad_Cast));
 		} else {
-		    fis.queue.addLast(new FlowsInView.FlowIn(pi, RegisteredHostsView.Location_Unknown));
+		    fis.queue.add(new FlowsInView.FlowIn(pi, RegisteredHostsView.Location_Unknown));
 		}
 	    } else {
 		//. The registered switch has already left
@@ -108,9 +108,9 @@ public class LocationManagementApp extends App {
 		    hosts.acquireWrite();
 		    hosts.removeHostLocation(pi.flow.dlDst);
 		    hosts.releaseWrite();
-		    fis.queue.addLast(new FlowsInView.FlowIn(pi, RegisteredHostsView.Location_Unknown));
+		    fis.queue.add(new FlowsInView.FlowIn(pi, RegisteredHostsView.Location_Unknown));
 		} else
-		    fis.queue.addLast(new FlowsInView.FlowIn(pi, dst));
+		    fis.queue.add(new FlowsInView.FlowIn(pi, dst));
 	    }
 	}
 

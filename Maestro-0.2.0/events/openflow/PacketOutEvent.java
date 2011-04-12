@@ -110,10 +110,10 @@ public class PacketOutEvent extends ToSpecificSwitchEvent implements Comparable<
 
 		if (OFPConstants.OP_UNBUFFERED_BUFFER_ID == bufferId) {
 		    // TODO: potential room for optimization
-		    for (int i=0;i<data.size;i++) {
+		    for (int i=0;i<dataLen;i++) {
 			buf[pos+i] = data.data[i];
 		    }
-		    pos += data.size;
+		    pos += dataLen;
 		}
 		    
 		Utilities.Assert((pos-index)==length, "pos-length does not match length!");

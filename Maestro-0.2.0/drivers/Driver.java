@@ -20,7 +20,8 @@
 
 package drivers;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.nio.ByteBuffer;
 import java.nio.ByteBuffer;
 
 import events.Event;
@@ -96,7 +97,7 @@ public abstract class Driver {
      * @param events the events to commit
      * @return true if successful, false otherwise
      */
-    abstract public boolean commitEvent(LinkedList<Event> events);
+    abstract public boolean commitEvent(ArrayList<Event> events);
 	
     /**
      * Print some infomation

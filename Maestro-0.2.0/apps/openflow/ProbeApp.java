@@ -69,7 +69,13 @@ public class ProbeApp extends App {
     private PacketOutEvent constructLLDPPacket(SwitchJoinEvent sw, SwitchJoinEvent.PhysicalPort port) {
 	//. TODO: Currently not compatible to standard LLDP, nor to NOX
 	//. right now just a temporary simplified implementation for Maestro
-	PacketOutEvent ret = new PacketOutEvent();
+	PacketOutEvent ret;
+	if (Parameters.useMemoryMgnt) {
+	    ret = Parameters.am.memMgr.allocPacketOutEvent();
+	} else {
+	    ret = new PacketOutEvent();
+	}
+	
 	ret.send = true;
 	ret.dpid = sw.dpid;
 	ret.bufferId = OFPConstants.OP_UNBUFFERED_BUFFER_ID;
@@ -81,7 +87,14 @@ public class ProbeApp extends App {
 	//. The data section contains: [dstMAC(6) srcMAC(6) ethType(2) chassisId(2+long) portId(2+unsigned short) ttl(2+unsigned short) end(2)]
 	ret.dataLen = OFPConstants.OfpConstants.OFP_ETH_ALEN*2 + 2 + 2 + Long.SIZE/8 + 2 + Short.SIZE/8 + 2 + Short.SIZE/8 + 2;
 	//ret.data = new byte[ret.dataLen];
-	ret.data = new PacketInEvent.DataPayload(ret.dataLen);
+	//ret.data = new PacketInEvent.DataPayload(ret.dataLen);
+	if (Parameters.useMemoryMgnt) {
+	    ret.data = Parameters.am.memMgr.allocPacketInEventDataPayload(ret.dataLen);
+	}
+	else {
+	    ret.data = new PacketInEvent.DataPayload(ret.dataLen);
+	}
+	
 	int index = 0;
 	for (int i=0;i<OFPConstants.OfpConstants.OFP_ETH_ALEN;i++) {
 	    try {

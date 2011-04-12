@@ -89,12 +89,10 @@ public class RouteFlowApp extends App {
 		    current = next;
 		    next = rtv.next;
 		}
-
-		if (Parameters.useMemoryMgnt) {
-		    Parameters.am.memMgr.freePacketInEvent(fl.pi);
-		}
 	    }
-	    
+	    if (Parameters.useMemoryMgnt) {
+		Parameters.am.memMgr.freePacketInEvent(fl.pi);
+	    }
 	}
 		
 	ViewsIOBucket output = new ViewsIOBucket();

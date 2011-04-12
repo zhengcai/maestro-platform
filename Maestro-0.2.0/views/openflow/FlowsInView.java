@@ -20,7 +20,7 @@
 
 package views.openflow;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 
 import drivers.Driver;
 import views.View;
@@ -42,10 +42,10 @@ public class FlowsInView extends View {
 	}
     }
 	
-    public LinkedList<FlowIn> queue;
+    public ArrayList<FlowIn> queue;
 	
     public FlowsInView() {
-	queue = new LinkedList<FlowIn>();
+	queue = new ArrayList<FlowIn>();
     }
 
     @Override

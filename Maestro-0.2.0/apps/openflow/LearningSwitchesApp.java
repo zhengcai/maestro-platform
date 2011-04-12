@@ -20,7 +20,7 @@
 
 package apps.openflow;
 
-import java.util.LinkedList;
+import java.util.*;
 
 import events.openflow.PacketInEvent;
 import events.openflow.FlowModEvent;
@@ -57,7 +57,7 @@ public class LearningSwitchesApp extends App {
 	FlowConfigView config = new FlowConfigView();
 	PacketsOutView pkts = new PacketsOutView();
 
-	LinkedList<PacketInEvent> work = pis.incoming;
+	ArrayList<PacketInEvent> work = pis.incoming;
 		
 	for (PacketInEvent pi : work) {
 	    /*

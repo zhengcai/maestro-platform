@@ -20,7 +20,7 @@
 
 package views.openflow;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 
 import drivers.Driver;
 import sys.Parameters;
@@ -34,12 +34,10 @@ import events.openflow.PacketInEvent;
  * @author Zheng Cai
  */
 public class PacketsInView extends View {
-    public LinkedList<LinkedList<PacketInEvent>> queues;
-    public LinkedList<PacketInEvent> incoming;
+    public ArrayList<PacketInEvent> incoming;
     
     public PacketsInView() {
-	queues = new LinkedList<LinkedList<PacketInEvent>>();
-	incoming = new LinkedList<PacketInEvent>();
+	incoming = new ArrayList<PacketInEvent>();
     }
 
     @Override
@@ -54,10 +52,11 @@ public class PacketsInView extends View {
 	    return false;
 	}
 
+	boolean flush = ((PacketInEvent)e).flush;
 	if (!((PacketInEvent)e).dummy)
-	    incoming.addLast((PacketInEvent)e);
+	    incoming.add((PacketInEvent)e);
 
-	if (((PacketInEvent)e).flush) {
+	if (/*((PacketInEvent)e).flush*/ flush) {
 	    return incoming.size() > 0;
 	}
 

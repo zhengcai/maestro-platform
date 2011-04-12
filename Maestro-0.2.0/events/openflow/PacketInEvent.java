@@ -145,6 +145,8 @@ public class PacketInEvent extends MemoryPoolEvent {
     public boolean flush = false; //. Whether to flush the input batching queue
     public boolean dummy = false; //. Whether this is a dummy packet
 
+    public static final PacketInEvent flushDummy = new PacketInEvent(true);
+
     public PacketInEvent() {
 	super(-1);
 	flow = new FlowInfo();
@@ -153,6 +155,12 @@ public class PacketInEvent extends MemoryPoolEvent {
     public PacketInEvent(int idx) {
 	super(idx);
 	flow = new FlowInfo();
+    }
+
+    public PacketInEvent(boolean d) {
+	super(-1);
+	dummy = d;
+	flush = true;
     }
 
     /**

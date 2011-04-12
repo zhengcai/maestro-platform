@@ -35,30 +35,30 @@ import views.View;
  * @author Zheng Cai
  */
 public class FlowConfigView extends View {
-    public HashMap<Long, LinkedList<Event>> configs;
+    public HashMap<Long, ArrayList<Event>> configs;
 	
     public FlowConfigView() {
-	configs = new HashMap<Long, LinkedList<Event>>();
+	configs = new HashMap<Long, ArrayList<Event>>();
     }
 	
     public void addFlowModEvent(FlowModEvent fm) {
-	LinkedList<Event> holder = configs.get(fm.dpid);
+	ArrayList<Event> holder = configs.get(fm.dpid);
 	if (holder == null) {
-	    holder = new LinkedList<Event>();
+	    holder = new ArrayList<Event>();
 	    configs.put(fm.dpid, holder);
 	}
-	holder.addLast(fm);
+	holder.add(fm);
     }
 
     @Override
 	public void commit(Driver driver) {
-	ArrayList<LinkedList<Event>> remaining = new ArrayList<LinkedList<Event>>();
-	for (LinkedList<Event> events : configs.values()) {
+	ArrayList<ArrayList<Event>> remaining = new ArrayList<ArrayList<Event>>();
+	for (ArrayList<Event> events : configs.values()) {
 	    if (!driver.commitEvent(events))
 		remaining.add(events);
 	}
 	configs.clear();
-	for (LinkedList<Event> events : remaining) {
+	for (ArrayList<Event> events : remaining) {
 	    while (!driver.commitEvent(events));
 	}
 	remaining.clear();

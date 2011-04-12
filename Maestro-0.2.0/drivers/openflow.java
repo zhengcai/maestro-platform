@@ -514,6 +514,9 @@ public class openflow extends Driver {
 	    
 	    lldp.dstDpid =pi.dpid;
 	    lldp.dstPort = pi.inPort;
+	    if (Parameters.useMemoryMgnt) {
+		Parameters.am.memMgr.freePacketInEvent(pi);
+	    }
 	    if (sw.dpid == 0) {
 		synchronized(sw.lldpQueue) {
 		    sw.lldpQueue.addLast(lldp);
@@ -538,13 +541,7 @@ public class openflow extends Driver {
      * processed immediately
      */
     public void flush() {
-	PacketInEvent pi;
-	if (Parameters.useMemoryMgnt) {
-	    pi = Parameters.am.memMgr.allocPacketInEvent();
-	} else {
-	    pi = new PacketInEvent();
-	}
-	pi.flush = true;
+	PacketInEvent pi = PacketInEvent.flushDummy;
 	pi.dummy = true;
 	if (Parameters.divide > 0) {
 	    int toWhich = Parameters.am.workerMgr.getCurrentWorkerID();
@@ -593,11 +590,11 @@ public class openflow extends Driver {
     }
     
     @Override
-	public boolean commitEvent(LinkedList<Event> events) {
+	public boolean commitEvent(ArrayList<Event> events) {
 	if (events.size() == 0) {
 	    return false;
 	}
-	Event e = events.getFirst();
+	Event e = events.get(0);
 	if (e == null) {
 	    return false;
 	}
@@ -625,13 +622,19 @@ public class openflow extends Driver {
     }
 
     class Partition {
-	public LinkedList<Event> es = new LinkedList<Event>();
+	public ArrayList<Event> es;// = new ArrayList<Event>();
 	public int totalLength = 0;
 	public long dpid;
 	public Switch sw;
 		
 	public ByteBuffer toPacket() {
-	    ByteBuffer pkt = ByteBuffer.allocate(totalLength);
+	    ByteBuffer pkt;
+	    if (Parameters.useMemoryMgnt) {
+		pkt = Parameters.am.memMgr.allocByteBuffer(totalLength);
+	    }
+	    else {
+		pkt = ByteBuffer.allocate(totalLength);
+	    }
 	    
 	    int pos = 0;
 	    for (Event e : es) {
@@ -648,6 +651,7 @@ public class openflow extends Driver {
 		    }
 		}
 	    }
+	    pkt.limit(totalLength);
 
 	    return pkt;
     	}
@@ -659,9 +663,9 @@ public class openflow extends Driver {
     //HashMap<Long, Partition> pendingPts = new HashMap<Long, Partition>();
     
 	
-    private boolean processToSpecificSwitchEvent(LinkedList<Event> events) {
+    private boolean processToSpecificSwitchEvent(ArrayList<Event> events) {
 	// Assume that the dpids in "events" are the same
-	long dpid = ((ToSpecificSwitchEvent)events.getFirst()).dpid;
+	long dpid = ((ToSpecificSwitchEvent)events.get(0)).dpid;
 	Switch target = dpid2switch.get(dpid);
 	if (null == target)
 	    return false;
@@ -732,12 +736,13 @@ public class openflow extends Driver {
 	    of.pendingPts.remove(pt.dpid);
 	    }
 	    */
-	    if ( pt.es.getFirst() instanceof PacketOutEvent)
+	    if ( pt.es.get(0) instanceof PacketOutEvent)
 		target.totalProcessed += pt.es.size();
 	    
 	    if (Parameters.batchOutput) {
 		ByteBuffer pkt = pt.toPacket();
 		SendPktOut(pt.dpid, pkt);
+		Parameters.am.memMgr.freeByteBuffer(pkt);
 	    } else {
 		for (Event e : pt.es) {
 		    ToSpecificSwitchEvent tsse = (ToSpecificSwitchEvent)e;
@@ -791,13 +796,13 @@ public class openflow extends Driver {
 	    boolean increasing = true;
 	    int batched = 0;
 	    long begin = 0, finish = 0;
-	    long lastLatency = 0;
-	    long lastLast = 0;
+	    double lastScore = 0;
 	    int printFreq = 0;
 	    int count = 0;
 	    final int MaxSteps = 100; //. Maximum IBT is MaxSteps*step
 	    final int HistoryWeight = 80; //. History value weighs 80%
-	    long[] history = new long[MaxSteps];
+	    final long MaxDelay = 10000; //. MicroSecond
+	    double[] history = new double[MaxSteps];
 
 	    LinkedList<Switch> skipped = new LinkedList<Switch>();
 	    while (true) {
@@ -879,28 +884,32 @@ public class openflow extends Driver {
 		    for (RawMessage msg : msgs) {
 			if (batched >= ibt) {
 			    if (of.dispatchPacket(sw, msg.buf, msg.start, msg.length, true)) {
+				long allTime = (System.nanoTime() - begin) / 1000; //. Microsecond
+				//double score = ((double)(MaxDelay*allTime)) / batched;
+				double score = ((double)(MaxDelay-allTime)*batched) / (MaxDelay*allTime);
 				
-				long allTime = System.nanoTime() - begin;
-				long latency = allTime / batched + allTime / 2000; //. Average latency for each request
-
-				
-				long realLa = latency;
+				double realScore = score;
 				
 				//. Adding history into the evaluation
 				int hisIdx = ibt / step;
 				if (history[hisIdx] == 0) {
-				    history[hisIdx] = latency;
+				    history[hisIdx] = score;
 				} else {
-				    latency = (latency*(100-HistoryWeight) + history[hisIdx]*HistoryWeight) / 100;
-				    history[hisIdx] = latency;
+				    score = (score*(100-HistoryWeight) + history[hisIdx]*HistoryWeight) / 100;
+				    history[hisIdx] = score;
 				}
 				
 				
 				if (workerID == 1) {
-				    System.err.println((count++)+" "+ibt+" "+increasing+" "+latency+" ("+realLa+") "+lastLatency+" "+allTime);
+				    //System.err.println((count++)+" "+ibt+" "+increasing+" "+score+" ("+realScore+") "+lastScore+" "+allTime);
+				    System.err.println(Parameters.newCountfm+" "+
+						       Parameters.newCountpi+" "+
+						       Parameters.newCountpo+" "+
+						       Parameters.newCountdata+" "+
+						       Parameters.newCountbuffer);
 				}
 				
-				if (latency < lastLatency) { //. Better
+				if (score > lastScore) { //. Better
 				    if (increasing && congested) {
 					ibt += step;
 					if (ibt > maxIbt)
@@ -915,8 +924,7 @@ public class openflow extends Driver {
 				    increasing = !increasing;
 				}
 
-				lastLast = lastLatency;
-				lastLatency = latency;
+				lastScore = score;
 				congested = false;
 				
 				batched = 0;

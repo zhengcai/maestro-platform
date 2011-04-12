@@ -5,7 +5,7 @@ my $javapath = $ENV{'JAVA_HOME'} or die "Please configure JAVA_HOME to the right
 my $configfile = $ARGV[0] or die "Run with: parameter-configuration-file dag-file";
 my $dagfile = $ARGV[1] or die "Run with: parameter-configuration-file dag-file";
 
-system("$javapath/bin/java -cp build/ sys/Main $configfile $dagfile daemon 2>err.log &");
+system("$javapath/bin/java -cp build/ sys/Main $configfile $dagfile daemon &");#2>err.log &");
 sleep(1);
 
 #=begin comment

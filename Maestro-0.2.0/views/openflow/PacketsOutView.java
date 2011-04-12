@@ -36,33 +36,34 @@ import sys.Parameters;
  * @author Zheng Cai
  */
 public class PacketsOutView extends View {
-    public HashMap<Long, LinkedList<Event>> pkts;
+    public HashMap<Long, ArrayList<Event>> pkts;
 	
     public PacketsOutView() {
-	pkts = new HashMap<Long, LinkedList<Event>>();
+	pkts = new HashMap<Long, ArrayList<Event>>();
     }
 	
     public void addPacketOutEvent(PacketOutEvent po) {
-	LinkedList<Event> pktHolder = pkts.get(po.dpid);
+	ArrayList<Event> pktHolder = pkts.get(po.dpid);
 	if (pktHolder == null) {
-	    pktHolder = new LinkedList<Event>();
+	    pktHolder = new ArrayList<Event>();
 	    pkts.put(po.dpid, pktHolder);
 	}
-	pktHolder.addLast(po);
+	pktHolder.add(po);
     }
 
     @Override
 	public void commit(Driver driver) {
 	int size = 0;
-	ArrayList<LinkedList<Event>> remaining = new ArrayList<LinkedList<Event>>();
-	for (LinkedList<Event> events : pkts.values()) {
+	ArrayList<ArrayList<Event>> remaining = new ArrayList<ArrayList<Event>>();
+	for (ArrayList<Event> events : pkts.values()) {
+	    size += events.size();
 	    size += events.size();
 	    if (!driver.commitEvent(events))
 		remaining.add(events);
 	    //events.clear();
 	}
 	pkts.clear();
-	for (LinkedList<Event> events : remaining) {
+	for (ArrayList<Event> events : remaining) {
 	    while (!driver.commitEvent(events));
 	}
 	remaining.clear();
@@ -85,7 +86,7 @@ public class PacketsOutView extends View {
 
     public int getTotalSize() {
 	int ret = 0;
-	for (LinkedList<Event> events : pkts.values()) {
+	for (ArrayList<Event> events : pkts.values()) {
 	    ret += events.size();
 	}
 	return ret;

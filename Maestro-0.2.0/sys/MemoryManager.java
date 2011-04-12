@@ -20,6 +20,9 @@
 
 package sys;
 
+import java.util.*;
+import java.nio.ByteBuffer;
+
 import events.openflow.*;
 
 /**
@@ -30,224 +33,192 @@ import events.openflow.*;
  * Need a re-design and re-implementation
  */
 public class MemoryManager {
-    public static int FM_POOL_SIZE = 81920;
-    public static int PO_POOL_SIZE = 81920;
-    public static int PI_POOL_SIZE = 81920;
-    public static int DATA_POOL_SIZE = 81920;
-
     public class MemoryPool {
-	public class FlowModPool {
-	    public FlowModEvent[] pool;
-	    public boolean[] bitmap;
-	    public int pos;
-	    public int freeNum;
-	}
-		
-	public class PacketOutPool {
-	    public PacketOutEvent[] pool;
-	    public boolean[] bitmap;
-	    public int pos;
-	    public int freeNum;
-	}
-		
-	public class PacketInPool {
-	    public PacketInEvent[] pool;
-	    public boolean[] bitmap;
-	    public int pos;
-	    public int freeNum;
-	}
-		
-	public class PacketInDataPayloadPool {
-	    public PacketInEvent.DataPayload[] pool;
-	    public boolean[] bitmap;
-	    public int pos;
-	    public int freeNum;
-	}
-		
-	public FlowModPool fm;
-	public PacketOutPool po;
-	public PacketInPool pi;
-	public PacketInDataPayloadPool data;
+	public ArrayList<Stack<FlowModEvent>> fm;
+	public ArrayList<Stack<PacketOutEvent>> po;
+	public ArrayList<Stack<PacketInEvent>> pi;
+	public ArrayList<Stack<PacketInEvent.DataPayload>> data;
+	public ArrayList<Stack<ByteBuffer>> buffer;
+
+	public Stack<FlowModEvent> sfm;
+	public Stack<PacketOutEvent> spo;
+	public Stack<PacketInEvent> spi;
+	public Stack<PacketInEvent.DataPayload> sdata;
+	public Stack<ByteBuffer> sbuffer;
 		
 	public MemoryPool() {
-	    fm = new FlowModPool();
-	    po = new PacketOutPool();
-	    pi = new PacketInPool();
-	    data = new PacketInDataPayloadPool();
+	    fm = new ArrayList<Stack<FlowModEvent>>();
+	    po = new ArrayList<Stack<PacketOutEvent>>();
+	    pi = new ArrayList<Stack<PacketInEvent>>();
+	    data = new ArrayList<Stack<PacketInEvent.DataPayload>>();
+	    buffer = new ArrayList<Stack<ByteBuffer>>();
+	    
+	    for (int i=0;i<Parameters.divide;i++) {
+		fm.add(new Stack<FlowModEvent>());
+		po.add(new Stack<PacketOutEvent>());
+		pi.add(new Stack<PacketInEvent>());
+		data.add(new Stack<PacketInEvent.DataPayload>());
+		buffer.add(new Stack<ByteBuffer>());
+	    }
+
+	    sfm = new Stack<FlowModEvent>();
+	    spo = new Stack<PacketOutEvent>();
+	    spi = new Stack<PacketInEvent>();
+	    sdata = new Stack<PacketInEvent.DataPayload>();
+	    sbuffer = new Stack<ByteBuffer>();
 	}
     }
+
+    public static final int DATA_SIZE = 1024;
+    public static final int BUFFER_SIZE = 1024 * 128;
 	
     public MemoryPool pool;
 	
     public MemoryManager() {
 	pool = new MemoryPool();
-		
-	pool.fm.pool = new FlowModEvent[FM_POOL_SIZE];
-	pool.fm.bitmap = new boolean[FM_POOL_SIZE];
-	for (int i=0;i<FM_POOL_SIZE;i++) {
-	    pool.fm.pool[i] = new FlowModEvent(i);
-	    pool.fm.pool[i].actions = new PacketOutEvent.Action[1];
-	    pool.fm.pool[i].actions[0] = new PacketOutEvent.Action();
-	    pool.fm.bitmap[i] = false;
-	}
-	pool.fm.pos = 0;
-	pool.fm.freeNum = FM_POOL_SIZE;
-		
-	pool.po.pool = new PacketOutEvent[PO_POOL_SIZE];
-	pool.po.bitmap = new boolean[PO_POOL_SIZE];
-	for (int i=0;i<PO_POOL_SIZE;i++) {
-	    pool.po.pool[i] = new PacketOutEvent(i);
-	    pool.po.pool[i].actions = new PacketOutEvent.Action[1];
-	    pool.po.pool[i].actions[0] = new PacketOutEvent.Action();
-	    pool.po.bitmap[i] = false;
-	}
-	pool.po.pos = 0;
-	pool.po.freeNum = PO_POOL_SIZE;
-		
-	// TODO: right now actions can only contain one action,
-	// need to fix this to allow flexible actions allocation
-		
-	pool.pi.pool = new PacketInEvent[PI_POOL_SIZE];
-	pool.pi.bitmap = new boolean[PI_POOL_SIZE];
-	for (int i=0;i<PI_POOL_SIZE;i++) {
-	    pool.pi.pool[i] = new PacketInEvent(i);
-	    pool.pi.bitmap[i] = false;
-	}
-	pool.pi.pos = 0;
-	pool.pi.freeNum = PI_POOL_SIZE;
-		
-	pool.data.pool = new PacketInEvent.DataPayload[DATA_POOL_SIZE];
-	pool.data.bitmap = new boolean[DATA_POOL_SIZE];
-	for (int i=0;i<DATA_POOL_SIZE;i++) {
-	    // TODO: now fixed at 60 bytes, must be modified later!!!
-	    pool.data.pool[i] = new PacketInEvent.DataPayload(i, 60);
-	    pool.data.bitmap[i] = false;
-	}
-	pool.data.pos = 0;
-	pool.data.freeNum = DATA_POOL_SIZE;
     }
 	
     public FlowModEvent allocFlowModEvent() {
-	FlowModEvent ret = null;
-	synchronized (pool.fm) {
-	    if (pool.fm.freeNum <= 0) {
-		System.err.println("FM_POOL OUT OF MEMORY!!");
-		System.exit(-1);
-		return null;
-	    }
-	    while (pool.fm.bitmap[pool.fm.pos]) {
-		pool.fm.pos = (pool.fm.pos+1)%FM_POOL_SIZE;
-	    }
-	    ret = pool.fm.pool[pool.fm.pos];
-	    ret.valid = true;
-	    pool.fm.bitmap[pool.fm.pos] = true;
-	    pool.fm.freeNum --;
-	    pool.fm.pos = (pool.fm.pos+1)%FM_POOL_SIZE;
+	int which = Parameters.am.workerMgr.getCurrentWorkerID();
+	Stack<FlowModEvent> s;
+	if (which == -1)
+	    s = pool.sfm;
+	else
+	    s = pool.fm.get(which);
+	if (s.size() > 0)
+	    return s.pop();
+	else {
+	    Parameters.newCountfm ++;
+	    FlowModEvent ret = new FlowModEvent();
+	    ret.actions = new PacketOutEvent.Action[1];
+	    ret.actions[0] = new PacketOutEvent.Action();
+	    return ret;
 	}
-	return ret;
     }
 	
     public void freeFlowModEvent(FlowModEvent fm) {
-	if (fm.poolIdx < 0)
-	    return;
-	synchronized (pool.fm) {
-	    pool.fm.bitmap[fm.poolIdx] = false;
-	    fm.valid = false;
-	    pool.fm.freeNum ++;
+	int which = Parameters.am.workerMgr.getCurrentWorkerID();
+	if (which == -1) {
+	    pool.sfm.push(fm);
+	} else {
+	    pool.fm.get(which).push(fm);
 	}
     }
 	
     public PacketOutEvent allocPacketOutEvent() {
-	PacketOutEvent ret = null;
-	synchronized (pool.po) {
-	    if (pool.po.freeNum <= 0) {
-		System.err.println("PO_POOL OUT OF MEMORY!!");
-		System.exit(-1);
-		return null;
-	    }
-	    while (pool.po.bitmap[pool.po.pos]) {
-		pool.po.pos = (pool.po.pos+1)%PO_POOL_SIZE;
-	    }
-	    ret = pool.po.pool[pool.po.pos];
-	    ret.valid = true;
-	    pool.po.bitmap[pool.po.pos] = true;
-	    pool.po.freeNum --;
-	    pool.po.pos = (pool.po.pos+1)%PO_POOL_SIZE;
+	int which = Parameters.am.workerMgr.getCurrentWorkerID();
+	Stack<PacketOutEvent> s;
+	if (which == -1)
+	    s = pool.spo;
+	else
+	    s = pool.po.get(which);
+	if (s.size() > 0)
+	    return s.pop();
+	else {
+	    Parameters.newCountpo ++;
+	    //. TODO: right now there is only one action supported by the memory manager
+	    PacketOutEvent ret = new PacketOutEvent();
+	    ret.actions = new PacketOutEvent.Action[1];
+	    ret.actions[0] = new PacketOutEvent.Action();
+	    return ret;
 	}
-	return ret;
     }
 	
     public void freePacketOutEvent(PacketOutEvent po) {
-	if (po.poolIdx < 0)
-	    return;
-	synchronized (pool.po) {
-	    po.data = null;
-	    pool.po.bitmap[po.poolIdx] = false;
-	    po.valid = false;
-	    pool.po.freeNum ++;
+	int which = Parameters.am.workerMgr.getCurrentWorkerID();
+	if (which == -1) {
+	    pool.spo.push(po);
+	} else {
+	    pool.po.get(which).push(po);
 	}
     }
 	
     public PacketInEvent allocPacketInEvent() {
-	PacketInEvent ret = null;
-	synchronized (pool.pi) {
-	    if (pool.pi.freeNum <= 0) {
-		System.err.println("PI_POOL OUT OF MEMORY!!");
-		System.exit(-1);
-		return null;
-	    }
-	    while (pool.pi.bitmap[pool.pi.pos]) {
-		pool.pi.pos = (pool.pi.pos+1)%PI_POOL_SIZE;
-	    }
-	    ret = pool.pi.pool[pool.pi.pos];
-	    ret.valid = true;
-	    pool.pi.bitmap[pool.pi.pos] = true;
-	    pool.pi.freeNum --;
-	    pool.pi.pos = (pool.pi.pos+1)%PI_POOL_SIZE;
+	int which = Parameters.am.workerMgr.getCurrentWorkerID();
+	Stack<PacketInEvent> s;
+	if (which == -1)
+	    s = pool.spi;
+	else
+	    s = pool.pi.get(which);
+	if (s.size() > 0)
+	    return s.pop();
+	else {
+	    Parameters.newCountpi ++;
+	    return new PacketInEvent();
 	}
-	return ret;
     }
 	
     public void freePacketInEvent(PacketInEvent pi) {
-	if (pi.poolIdx < 0)
-	    return;
-	synchronized (pool.pi) {
-	    pi.data = null;
-	    pool.pi.bitmap[pi.poolIdx] = false;
-	    pi.valid = false;
-	    pool.pi.freeNum ++;
+	int which = Parameters.am.workerMgr.getCurrentWorkerID();
+	if (which == -1) {
+	    pool.spi.push(pi);
+	} else {
+	    pool.pi.get(which).push(pi);
 	}
     }
 	
     public PacketInEvent.DataPayload allocPacketInEventDataPayload(int size) {
-	// TODO: right now the size is kinda ignored, all sizes are 60 bytes in the pool
-	PacketInEvent.DataPayload ret = null;
-	synchronized (pool.data) {
-	    if (pool.data.freeNum <= 0) {
-		System.err.println("DATA_POOL OUT OF MEMORY!!");
-		System.exit(-1);
-		return null;
+	// TODO: right now the size is kinda ignored, all sizes are DATA_SIZE bytes in the pool
+	int which = Parameters.am.workerMgr.getCurrentWorkerID();
+	Stack<PacketInEvent.DataPayload> s;
+	if (which == -1)
+	    s = pool.sdata;
+	else
+	    s = pool.data.get(which);
+	if (s.size() > 0) {
+	    PacketInEvent.DataPayload ret = s.pop();
+	    /*
+	    if (ret.data.length < size) {
+		return new PacketInEvent.DataPayload(DATA_SIZE);
 	    }
-	    while (pool.data.bitmap[pool.data.pos]) {
-		pool.data.pos = (pool.data.pos+1)%DATA_POOL_SIZE;
-	    }
-	    ret = pool.data.pool[pool.data.pos];
-	    ret.valid = true;
-	    pool.data.bitmap[pool.data.pos] = true;
-	    pool.data.freeNum --;
-	    pool.data.pos = (pool.data.pos+1)%DATA_POOL_SIZE;
+	    */
+	    return ret;
 	}
-	ret.size = size;
-	return ret;
+	else {
+	    Parameters.newCountdata ++;
+	    return new PacketInEvent.DataPayload(DATA_SIZE);
+	}
     }
 	
     public void freePacketInEventDataPayload(PacketInEvent.DataPayload data) {
-	if (data.poolIdx < 0)
-	    return;
-	synchronized (pool.data) {
-	    pool.data.bitmap[data.poolIdx] = false;
-	    data.valid = false;
-	    pool.data.freeNum ++;
+	int which = Parameters.am.workerMgr.getCurrentWorkerID();
+	if (which == -1) {
+	    pool.sdata.push(data);
+	} else {
+	    pool.data.get(which).push(data);
+	}
+    }
+
+    public ByteBuffer allocByteBuffer(int size) {
+	// TODO: right now the size is kinda ignored, all sizes are BUFFER_SIZE bytes in the pool
+	int which = Parameters.am.workerMgr.getCurrentWorkerID();
+	Stack<ByteBuffer> s;
+	if (which == -1)
+	    s = pool.sbuffer;
+	else
+	    s = pool.buffer.get(which);
+	if (s.size() > 0) {
+	    ByteBuffer ret = s.pop();
+	    if (ret.capacity() < size) {
+		s.push(ret);
+		Parameters.newCountbuffer ++;
+		return ByteBuffer.allocate(size);
+	    }
+	    return ret;
+	}
+	else {
+	    Parameters.newCountbuffer ++;
+	    return ByteBuffer.allocate(BUFFER_SIZE);
+	}
+    }
+	
+    public void freeByteBuffer(ByteBuffer buffer) {
+	buffer.clear();
+	int which = Parameters.am.workerMgr.getCurrentWorkerID();
+	if (which == -1) {
+	    pool.sbuffer.push(buffer);
+	} else {
+	    pool.buffer.get(which).push(buffer);
 	}
     }
 }
