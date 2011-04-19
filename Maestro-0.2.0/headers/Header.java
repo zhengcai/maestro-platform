@@ -53,4 +53,8 @@ public abstract class Header {
      * @return The position in the buffer after parsing the header
      */
     public abstract int parseHeader(byte[] buf, int pos);
+
+    public void free() {
+	    
+    }
 }

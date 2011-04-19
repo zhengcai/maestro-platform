@@ -120,16 +120,13 @@ public class ViewManager {
 	    return;
     	}
     	
-    	//. TODO: currently trigger the DAG for each event, no batching yet
     	View v = global.getView(viewName);
     	if (v == null) {
 	    return;
     	}
     	
     	if (v.processEvent(e)) {
-	    HashSet<String> trigger = new HashSet<String>();
-	    trigger.add(viewName);
-	    am.triggerDag(global, trigger);
+	    am.triggerDag(global, viewName);
     	}
     }
 
@@ -141,7 +138,6 @@ public class ViewManager {
 
 	boolean whetherConcurrentEnabled = true;
 
-	//. TODO: currently trigger the DAG for each event, no batching yet
 	View v = global.getView(viewName+"_"+which);
 	if (v == null) {
 	    whetherConcurrentEnabled = false;
@@ -152,12 +148,10 @@ public class ViewManager {
 	}
 
 	if (v.processEvent(e)) {
-	    HashSet<String> trigger = new HashSet<String>();
 	    if (whetherConcurrentEnabled)
-		trigger.add(viewName+"_"+which);
+		am.triggerDag(global, viewName+"_"+which);
 	    else
-		trigger.add(viewName);
-	    am.triggerDag(global, trigger);
+		am.triggerDag(global, viewName);
 	}
     }
     
@@ -180,9 +174,7 @@ public class ViewManager {
     	}
     	
     	if (v.processEvent(e)) {
-	    HashSet<String> trigger = new HashSet<String>();
-	    trigger.add(viewName);
-	    am.triggerDag(global, trigger);
+	    am.triggerDag(global, viewName);
     	}
     }
     

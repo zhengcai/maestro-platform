@@ -28,9 +28,9 @@ import views.*;
  *
  */
 public class DAGRuntimeThread implements Runnable {
-    AppInstanceNode current;
+    public AppInstanceNode current;
     private ViewsIOBucket currentReservedViews;
-    ApplicationManager am;
+    public ApplicationManager am;
     DAGRuntime dr;
 	
     /** Create a new instance of NodeThread*/
@@ -66,9 +66,10 @@ public class DAGRuntimeThread implements Runnable {
 	   }
 	   am.produce(this, result);
 	*/
-		
-	ViewsIOBucket input = dr.env.getAppNodeReadViews(current);
-	ViewsIOBucket result = current.app.process(input);
+
+	dr.bucket.clear();
+	dr.env.getAppNodeReadViews(current, dr.bucket);
+	ViewsIOBucket result = current.app.process(dr.bucket);
 	am.produce(this, result);
     }
 	

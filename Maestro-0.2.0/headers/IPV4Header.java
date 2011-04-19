@@ -42,7 +42,7 @@
 
 package headers;
 
-import sys.Utilities;
+import sys.*;
 
 /**
  * The representation of an IPV4 Packet in Maestro
@@ -110,11 +110,19 @@ public class IPV4Header extends Header {
 	    inner.outer = this;
 	    break;
 	case IPV4_TYPE_TCP:
-	    inner = new TCPHeader();
+	    if (Parameters.useMemoryMgnt) {
+		inner = Parameters.am.memMgr.allocTCPHeader();
+	    } else {
+		inner = new TCPHeader();
+	    }
 	    inner.outer = this;
 	    break;
 	case IPV4_TYPE_UDP:
-	    inner = new UDPHeader();
+	    if (Parameters.useMemoryMgnt) {
+		inner = Parameters.am.memMgr.allocUDPHeader();
+	    } else {
+		inner = new UDPHeader();
+	    }
 	    inner.outer = this;
 	    break;
 	default:
@@ -130,5 +138,13 @@ public class IPV4Header extends Header {
     public String toString() {
 	return String.format("|IPV4 Header==Src IP:%x|Dst IP:%x|nwTos:%x|nwProto:%x|",
 			     nwSrc, nwDst, nwTos, nwProto);
+    }
+
+    public void free() {
+	if (Parameters.useMemoryMgnt) {
+	    if (inner != null)
+		inner.free();
+	    Parameters.am.memMgr.freeIPV4Header(this);
+	}
     }
 }

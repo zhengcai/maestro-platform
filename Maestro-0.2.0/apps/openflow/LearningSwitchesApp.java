@@ -53,9 +53,8 @@ public class LearningSwitchesApp extends App {
 	PacketsInView pis = (PacketsInView)input.getView(0);
 	JoinedSwitchesView sws = (JoinedSwitchesView)input.getView(1);
 	LearnedMACsView macs = (LearnedMACsView)input.getView(2);
-
-	FlowConfigView config = new FlowConfigView();
-	PacketsOutView pkts = new PacketsOutView();
+	FlowConfigView config = (FlowConfigView)input.getView(3);
+	PacketsOutView pkts = (PacketsOutView)input.getView(4);
 
 	ArrayList<PacketInEvent> work = pis.incoming;
 		

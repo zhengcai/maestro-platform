@@ -61,6 +61,7 @@ public class Parameters {
     public static long newCountpo = 0;
     public static long newCountdata = 0;
     public static long newCountbuffer = 0;
+    public static long newCountdr = 0;
     
     public static long t1 = 0;
     public static long t2 = 0;

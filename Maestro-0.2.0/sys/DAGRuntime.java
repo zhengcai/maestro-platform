@@ -46,14 +46,14 @@ public class DAGRuntime {
     int state;
 	
     /** Actively running threads in this DAG*/
-    LinkedList<DAGRuntimeThread> active;
+    //ArrayList<DAGRuntimeThread> active;
 	
     /** Violations generated during this run of the DAG*/
-    LinkedList<Violation> violations;
+    //LinkedList<Violation> violations;
 	
     /** Currently suspended application instances
      * By calling ProduceAndYield()*/
-    LinkedList<SuspendedThreadNode> suspended;
+    //LinkedList<SuspendedThreadNode> suspended;
 	
     /** 
      * A map from applications to the number of threads that
@@ -73,18 +73,37 @@ public class DAGRuntime {
 	
     private long perfBefore;
 
-    public DAGRuntime(DAG d, Environment theEnv, ViewManager vm, int instance) {
+    public ViewsIOBucket bucket;
+    private DAGRuntimeThread tr;
+
+
+    public DAGRuntime(DAG d, Environment theEnv, int instance, ApplicationManager a) {
+	am = a;
 	dag = d;
 	sem = new Semaphore(1);
 	env = new LocalEnv();
 	env.addLocalENV(theEnv);
-	violations = new LinkedList<Violation>();
-	suspended = new LinkedList<SuspendedThreadNode>();
+	//violations = new LinkedList<Violation>();
+	//suspended = new LinkedList<SuspendedThreadNode>();
 	state = Constants.DAGStates.IDLE;
-	active = new LinkedList<DAGRuntimeThread>();
+	//active = new ArrayList<DAGRuntimeThread>();
 	instanceID = instance;
+	bucket = new ViewsIOBucket();
+	tr = new DAGRuntimeThread(null, am, this);
 		
 	threadArrivalMap = new HashMap<AppInstanceNode,Integer>();
+	for(AppInstanceNode n : d.nodes.values()) {
+	    threadArrivalMap.put(n, 0);
+	}
+    }
+
+    public void init(DAG d, Environment theEnv, int instance, ApplicationManager a) {
+	am = a;
+	dag = d;
+	env.addLocalENV(theEnv);
+	state = Constants.DAGStates.IDLE;
+	instanceID = instance;
+	threadArrivalMap.clear();
 	for(AppInstanceNode n : d.nodes.values()) {
 	    threadArrivalMap.put(n, 0);
 	}
@@ -110,7 +129,7 @@ public class DAGRuntime {
      * later might present a picture of the network that is inconsistent
      * with earlier views.
      */
-    public void start(ApplicationManager am) {
+    public void start() {
 	/*
 	if (Parameters.am.workerMgr.getCurrentWorkerID() == 1) {
 	    System.err.println("Starting DAG");
@@ -128,33 +147,21 @@ public class DAGRuntime {
     	
     	//. FIXME: This code is copied from Produce().  We should consolidate them.
     	
-    	//. There's no reason to set this here instead of the constructor, except that
-    	//. that's how the parameters were set up when I inherited this project and
-    	//. I'm looking to change as little as possible.
-    	this.am = am;
-    	
     	Iterator<AppInstanceEdge> it = dag.activation.edges.iterator();
 
     	while (it.hasNext()) {
 	    AppInstanceEdge e = it.next();
-	    DAGRuntimeThread tr = new DAGRuntimeThread(e.next, am, this);
+	    //DAGRuntimeThread tr = new DAGRuntimeThread(e.next, am, this);
+	    tr.current = e.next;
 	    addNodeThread(tr);
     	}
     }
     
     public void finish() {
-    	// TODO: adjust this according to the new workqueue framework
-    	/*
-	  for(SuspendedThreadNode stn : suspended) {
-	  stn.getThread().stop();
-	  }
-	  for(DAGRuntimeThread drt : active) {
-	  if(drt != Thread.currentThread()) drt.stop();
-	  }*/
-    	suspended.clear();
+    	//suspended.clear();
     	//active.clear();
     	env.clearLocal();
-    	violations.clear();
+    	//violations.clear();
     	state = Constants.DAGStates.IDLE;
     	
     	if (Parameters.measurePerf) {
@@ -176,7 +183,7 @@ public class DAGRuntime {
     
     /** Add a new NodeThread to the DAG and start the thread */
     public void addNodeThread(DAGRuntimeThread n) {
-    	active.addLast(n);
+    	//active.add(n);
     	if (Parameters.divide == 0) {
 	    n.run();
     	} else {
@@ -186,7 +193,7 @@ public class DAGRuntime {
     }
     
     public void delNodeThread(DAGRuntimeThread n) {
-    	active.remove(n);
+    	//active.remove(n);
     }
     
     /**
@@ -211,7 +218,7 @@ public class DAGRuntime {
     	 * simultaneously, before the other has chance to update. Neither
     	 * thread would run the next node, even though all threads would've arrived.
     	 */
-    	if(threadsArrived == (n.inDegree-1)) return true;
+    	if (threadsArrived == (n.inDegree-1)) return true;
     	
     	/*
     	 * Not all threads have arrived, and n is not ready to be executed.

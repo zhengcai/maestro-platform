@@ -99,4 +99,11 @@ public class ViewsIOBucket {
     public int getSize() {
     	return views.size();
     }
+
+    /**
+     * Clear this bucket
+     */
+    public void clear() {
+	views.clear();
+    }
 }

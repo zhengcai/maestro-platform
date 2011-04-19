@@ -446,34 +446,46 @@ public class ApplicationManager extends Thread {
      */
     public void startDag(Environment env, DAG dag) {
 	if (dag.concurrent) {
-	    DAGRuntime drun = new DAGRuntime(dag, env, vm,
-					     getNextInstanceID());
+	    DAGRuntime drun;
+	    if (Parameters.useMemoryMgnt) {
+		drun = memMgr.allocDAGRuntime(dag, env, getNextInstanceID(), this);
+	    } else {
+		drun = new DAGRuntime(dag, env, getNextInstanceID(), this);
+	    }
 	    
 	    synchronized (running) {
 		running.put(drun.instanceID ,drun);
 	    }
-	    drun.start(this);
+	    drun.start();
 	} else {
 	    if (checkConflict(dag)) {
 		synchronized (triggered) {
 		    if (whetherAlreadyWaiting(dag)) {
 			return;
 		    } else {
-			DAGRuntime drun = new DAGRuntime(dag, env, vm,
-							 getNextInstanceID());
+			DAGRuntime drun;
+			if (Parameters.useMemoryMgnt) {
+			    drun = memMgr.allocDAGRuntime(dag, env, getNextInstanceID(), this);
+			} else {
+			    drun = new DAGRuntime(dag, env, getNextInstanceID(), this);
+			}
 			drun.state = Constants.DAGStates.WAITING;
 			triggered.addLast(drun);
 		    }
 		}
 	    } else {
-		DAGRuntime drun = new DAGRuntime(dag, env, vm,
-						 getNextInstanceID());
+		DAGRuntime drun;
+		if (Parameters.useMemoryMgnt) {
+		    drun = memMgr.allocDAGRuntime(dag, env, getNextInstanceID(), this);
+		} else {
+		    drun = new DAGRuntime(dag, env, getNextInstanceID(), this);
+		}
 		
 		synchronized (running) {
 		    running.put(drun.instanceID ,drun);
 		}
 
-		drun.start(this);
+		drun.start();
 	    }
 	}
     }
@@ -483,19 +495,17 @@ public class ApplicationManager extends Thread {
      * search, not optimized Only trigger normal DAGs, not approval evaluation
      * DAGs
      * */
-    public void triggerDag(Environment env, HashSet<String> trigger) {
+    public void triggerDag(Environment env, String trigger) {
 	long before = 0;
 	if (Parameters.measurePerf) {
 	    before = System.nanoTime();
 	}
 	//. Generate the list of all DAGS triggered by any of the views in the VB
 	LinkedList<DAG> dags = new LinkedList<DAG>(), toAdd;
-	for (String s : trigger) {
-	    if ((toAdd = triggerMap.get(s)) != null) {
-		for (DAG j : toAdd) {
-		    if (!dags.contains(j))
-			dags.add(j);
-		}
+	if ((toAdd = triggerMap.get(trigger)) != null) {
+	    for (DAG j : toAdd) {
+		if (!dags.contains(j))
+		    dags.add(j);
 	    }
 	}
 
@@ -509,21 +519,29 @@ public class ApplicationManager extends Thread {
 	for (DAG dag : dags) {
 	    //. TODO: Only work for non-cloning version
 	    if (dag.concurrent) {
-		DAGRuntime drun = new DAGRuntime(dag, env, vm,
-						 getNextInstanceID());
+		DAGRuntime drun;
+		if (Parameters.useMemoryMgnt) {
+		    drun = memMgr.allocDAGRuntime(dag, env, getNextInstanceID(), this);
+		} else {
+		    drun = new DAGRuntime(dag, env, getNextInstanceID(), this);
+		}
 
 		synchronized (running) {
 		    running.put(drun.instanceID ,drun);
 		}
-		drun.start(this);
+		drun.start();
 	    } else {
 		if (checkConflict(dag)) {
 		    synchronized (triggered) {
 			if (whetherAlreadyWaiting(dag)) {
 			    continue;
 			} else {
-			    DAGRuntime drun = new DAGRuntime(dag, env, vm,
-							     getNextInstanceID());
+			    DAGRuntime drun;
+			    if (Parameters.useMemoryMgnt) {
+				drun = memMgr.allocDAGRuntime(dag, env, getNextInstanceID(), this);
+			    } else {
+				drun = new DAGRuntime(dag, env, getNextInstanceID(), this);
+			    }
 			    drun.state = Constants.DAGStates.WAITING;
 			    //Utilities.printlnDebug("("+workerMgr.getCurrentWorkerID()+") Add triggered "+drun.dag.id+" instance "+drun.instanceID);
 			    triggered.addLast(drun);
@@ -535,12 +553,16 @@ public class ApplicationManager extends Thread {
 			*/
 		    }
 		} else {
-		    DAGRuntime drun = new DAGRuntime(dag, env, vm,
-						     getNextInstanceID());
+		    DAGRuntime drun;
+		    if (Parameters.useMemoryMgnt) {
+			drun = memMgr.allocDAGRuntime(dag, env, getNextInstanceID(), this);
+		    } else {
+			drun = new DAGRuntime(dag, env, getNextInstanceID(), this);
+		    }
 		    synchronized (running) {
 			running.put(drun.instanceID ,drun);
 		    }
-		    drun.start(this);
+		    drun.start();
 		}
 	    }
 	}
@@ -672,16 +694,19 @@ public class ApplicationManager extends Thread {
 	synchronized (running) {
 	    running.remove(d.instanceID);
 	}
+	if (Parameters.useMemoryMgnt) {
+	    memMgr.freeDAGRuntime(d);
+	}
 	    
 	LinkedList<DAGRuntime> toRemove = new LinkedList<DAGRuntime>();
 
 	synchronized (triggered) {
-	    Iterator<DAGRuntime> it = triggered.iterator();
-	    while (it.hasNext()) {
-		d = it.next();
-		if (!checkConflict(d.dag)) {
-		    toRemove.addLast(d);
-		    //triggered.remove(d);
+	    //Iterator<DAGRuntime> it = triggered.iterator();
+	    //while (it.hasNext()) {
+	    //d = it.next();
+	    for (DAGRuntime dd : triggered) {
+		if (!checkConflict(dd.dag)) {
+		    toRemove.addLast(dd);
 		}
 	    }
 
@@ -696,7 +721,7 @@ public class ApplicationManager extends Thread {
 		running.put(dd.instanceID, dd);
 	    }
 	    //Utilities.printDebug("("+workerMgr.getCurrentWorkerID()+") Trigger to run ");
-	    d.start(this);
+	    dd.start();
 	}
 
 	/*
@@ -735,7 +760,7 @@ public class ApplicationManager extends Thread {
 		    if (!checkConflict(d.dag)) {
 			toRemove.add(d);
 			running.put(d.instanceID, d);
-			d.start(this);
+			d.start();
 		    }
 		}
 	    }

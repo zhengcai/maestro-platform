@@ -5,6 +5,8 @@ Package openflow
 Views
   JoinedSwitchesView switches
   PacketsInView packets_in Concurrent
+  FlowConfigView flow_config Concurrent
+  PacketsOutView packets_out Concurrent
   LearnedMACsView macs
 End Views
 
@@ -26,6 +28,8 @@ Begin DAG
     Input PacketsInView packets_in
     Input JoinedSwitchesView switches
     Input LearnedMACsView macs
+    Input FlowConfigView flow_config
+    Input PacketsOutView packets_out
     Output FlowConfigView flow_config
     Output PacketsOutView packets_out
     Output LearnedMACsView macs

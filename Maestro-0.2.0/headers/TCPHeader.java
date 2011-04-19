@@ -45,7 +45,7 @@
 
 package headers;
 
-import sys.Utilities;
+import sys.*;
 
 /**
  * The representation of an TCP Packet in Maestro
@@ -87,5 +87,12 @@ public class TCPHeader extends Header {
 	
 	return pos;
     }
-    
+
+    public void free() {
+	if (Parameters.useMemoryMgnt) {
+	    if (inner != null)
+		inner.free();
+	    Parameters.am.memMgr.freeTCPHeader(this);
+	}
+    }
 }

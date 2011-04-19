@@ -35,7 +35,7 @@
 
 package headers;
 
-import sys.Utilities;
+import sys.*;
 
 /**
  * The representation of an UDP Packet in Maestro
@@ -75,5 +75,13 @@ public class UDPHeader extends Header {
 	pos += 2;
 	
 	return pos;
+    }
+
+    public void free() {
+	if (Parameters.useMemoryMgnt) {
+	    if (inner != null)
+		inner.free();
+	    Parameters.am.memMgr.freeUDPHeader(this);
+	}
     }
 }

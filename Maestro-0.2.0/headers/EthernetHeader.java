@@ -38,7 +38,7 @@
 
 package headers;
 
-import sys.Utilities;
+import sys.*;
 
 /**
  * The representation of an Ethernet Packet in Maestro
@@ -110,7 +110,11 @@ public class EthernetHeader extends Header {
 	//. Creating the inner layer instance accordingly
 	switch (dlType) {
 	case ETH_TYPE_IPV4:
-	    inner = new IPV4Header();
+	    if (Parameters.useMemoryMgnt) {
+		inner = Parameters.am.memMgr.allocIPV4Header();
+	    } else {
+		inner = new IPV4Header();
+	    }
 	    inner.outer = this;
 	    break;
 	case ETH_TYPE_ARP:
@@ -136,5 +140,13 @@ public class EthernetHeader extends Header {
 			     dlDst[0], dlDst[1], dlDst[2], dlDst[3], dlDst[4], dlDst[5],
 			     dlSrc[0], dlSrc[1], dlSrc[2], dlSrc[3], dlSrc[4], dlSrc[5],
 			     dlType, dlVlan, dlVlanPcp);
+    }
+
+    public void free() {
+	if (Parameters.useMemoryMgnt) {
+	    if (inner != null)
+		inner.free();
+	    Parameters.am.memMgr.freeEthernetHeader(this);
+	}
     }
 }

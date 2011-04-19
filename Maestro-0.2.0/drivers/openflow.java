@@ -62,7 +62,7 @@ public class openflow extends Driver {
 	public long dpid = 0;
 	public SocketChannel channel = null;
 	public int bufferSize = 0;
-	public byte[] buffer = new byte[BUFFERSIZE];
+	public byte[] buffer = new byte[1024];
 	//public ByteBuffer outputBuffer;
 
 	public boolean chopping = false;
@@ -498,7 +498,12 @@ public class openflow extends Driver {
 	////////////////////////////////
 
 	//. Currently assume that all packets are ethernet frames
-	EthernetHeader eth = new EthernetHeader();
+	EthernetHeader eth;
+	if (Parameters.useMemoryMgnt) {
+	    eth = Parameters.am.memMgr.allocEthernetHeader();
+	} else {
+	    eth = new EthernetHeader();
+	}
 	pos = eth.parseHeader(buffer, pos);
 	pi.extractFlowInfo(eth);
 
@@ -517,6 +522,7 @@ public class openflow extends Driver {
 	    lldp.dstPort = pi.inPort;
 	    if (Parameters.useMemoryMgnt) {
 		Parameters.am.memMgr.freePacketInEvent(pi);
+		eth.free();
 	    }
 	    if (sw.dpid == 0) {
 		synchronized(sw.lldpQueue) {
@@ -527,6 +533,7 @@ public class openflow extends Driver {
 	    }
 	    return false;
 	} else {
+	    eth.free();
 	    if (Parameters.divide > 0) {
 		int toWhich = Parameters.am.workerMgr.getCurrentWorkerID();
 		vm.postEventConcurrent(pi, toWhich);
@@ -743,7 +750,9 @@ public class openflow extends Driver {
 	    if (Parameters.batchOutput) {
 		ByteBuffer pkt = pt.toPacket();
 		SendPktOut(pt.dpid, pkt);
-		Parameters.am.memMgr.freeByteBuffer(pkt);
+		if (Parameters.useMemoryMgnt) {
+		    Parameters.am.memMgr.freeByteBuffer(pkt);
+		}
 	    } else {
 		for (Event e : pt.es) {
 		    ToSpecificSwitchEvent tsse = (ToSpecificSwitchEvent)e;
@@ -793,7 +802,7 @@ public class openflow extends Driver {
 	    final int HOWMANYTRIES = 40;
 	    int ibt = Parameters.batchInputNum;
 	    int maxIbt = Parameters.batchInputNum;
-	    final int step = 100;
+	    final int step = 10;
 	    boolean congested = false;
 	    boolean increasing = true;
 	    int batched = 0;
@@ -801,10 +810,11 @@ public class openflow extends Driver {
 	    double lastScore = 0;
 	    int printFreq = 0;
 	    int count = 0;
-	    final int MaxSteps = 100; //. Maximum IBT is MaxSteps*step
+	    final int MaxSteps = 1000; //. Maximum IBT is MaxSteps*step
 	    final int HistoryWeight = 80; //. History value weighs 80%
-	    final long MaxDelay = 50000; //. MicroSecond
+	    final long MaxDelay = 1000; //. MicroSecond
 	    double[] history = new double[MaxSteps];
+	    long lastRound = System.nanoTime();
 
 	    LinkedList<Switch> skipped = new LinkedList<Switch>();
 	    while (true) {
@@ -824,6 +834,13 @@ public class openflow extends Driver {
 			skipped.clear();
 			idx = 0;
 			trySkipped = 0;
+			/*
+			long now = System.nanoTime();
+			if (workerID == 1) {
+			    System.err.println((now-lastRound)/1000);
+			}
+			lastRound = now;
+			*/
 			continue;
 		    } else {
 			sw = skipped.removeFirst();
@@ -887,8 +904,8 @@ public class openflow extends Driver {
 			if (batched >= ibt) {
 			    if (of.dispatchPacket(sw, msg.buf, msg.start, msg.length, true)) {
 				long allTime = (System.nanoTime() - begin) / 1000; //. Microsecond
-				//double score = ((double)(MaxDelay*allTime)) / batched;
-				double score = ((double)(MaxDelay-allTime)*batched) / (MaxDelay*allTime);
+				double score = ((double)batched) / (allTime);
+				//double score = ((double)(MaxDelay-allTime)*batched) / (MaxDelay*allTime);
 				
 				double realScore = score;
 				
@@ -909,25 +926,37 @@ public class openflow extends Driver {
 						       Parameters.newCountpi+" "+
 						       Parameters.newCountpo+" "+
 						       Parameters.newCountdata+" "+
-						       Parameters.newCountbuffer);
+						       Parameters.newCountbuffer+" "+
+						       Parameters.newCountdr);
 				    */
 				}
+
 				
-				if (score > lastScore) { //. Better
-				    if (increasing && congested) {
-					ibt += step;
-					if (ibt > maxIbt)
-					    maxIbt = ibt;
-				    } else {
-					if (ibt <= step)
-					    ibt = step;
-					else
-					    ibt -= step;
+				if (allTime > MaxDelay) {
+				    increasing = false;
+				    if (ibt <= step)
+					ibt = step;
+				    else
+					ibt -= step;
+				} else {
+				
+				    if (score > lastScore) { //. Better
+					if (increasing && congested) {
+					    ibt += step;
+					    if (ibt > maxIbt)
+						maxIbt = ibt;
+					} else {
+					    if (ibt <= step)
+						ibt = step;
+					    else
+						ibt -= step;
+					}
+				    } else { //. Worse
+					increasing = !increasing;
 				    }
-				} else { //. Worse
-				    increasing = !increasing;
 				}
 
+				//ibt = 1000;
 				lastScore = score;
 				congested = false;
 				

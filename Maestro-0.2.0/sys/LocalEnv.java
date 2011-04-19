@@ -30,7 +30,7 @@ import java.util.concurrent.Semaphore;
  * @author Zheng Cai
  */
 public class LocalEnv {
-    public Environment local;
+    public Environment local = null;;
 	
     Map<View,Semaphore> viewSemaphores;
 	
@@ -40,8 +40,10 @@ public class LocalEnv {
 	
     public void addLocalENV(Environment env) {
 	/* Take a snapshot of the current environment */
-	synchronized(env) {
-	    local = env.clone();
+	if (local == null) {
+	    synchronized(env) {
+		local = env.clone();
+	    }
 	}
 	//for(View v : local.getAllViews()) viewSemaphores.put(v, new Semaphore(1));
     }
@@ -75,8 +77,7 @@ public class LocalEnv {
      * @param node The application node this method is examining
      * @return All views read by node
      */
-    public ViewsIOBucket getAppNodeReadViews(AppInstanceNode node) {
-	ViewsIOBucket result = new ViewsIOBucket();
+    public void getAppNodeReadViews(AppInstanceNode node, ViewsIOBucket result) {
 	Iterator<String> it = node.input.keySet().iterator();
 	while (it.hasNext()) {
 	    String name = it.next();
@@ -96,7 +97,6 @@ public class LocalEnv {
 	    }
 	    result.addView(input.pos, v);
 	}
-	return result;
     }
 	
     /** 
@@ -138,6 +138,7 @@ public class LocalEnv {
      * 
      * @param node The node whose views we're releasing
      */
+    /*
     public void releaseViewsForNode(AppInstanceNode node) {
 	LinkedList<View> toRelease = new LinkedList<View>();
 	// Both of these sets of reviews should've been reserved
@@ -149,10 +150,12 @@ public class LocalEnv {
 	    s.release();
 	}
     }
+    */
 	
     /* FIXME: To really implement this mechanism correctly, we would have
      * to implement read/write locks.  This is a simple stand-in
      */
+    /*
     public ViewsIOBucket acquireViewsForNode(AppInstanceNode node) {
 	ViewsIOBucket ret;
 	LinkedList<View> toAcquire = new LinkedList<View>();
@@ -163,17 +166,18 @@ public class LocalEnv {
 	toAcquire.addAll(getAppNodeWriteViews(node).getAllViews());
 	toAcquire.addAll(ret.getAllViews());
 		
-	/* We need to acquire both the views that we'll read
-	 * and the ones we'll write, to avoid stepping on other
-	 * apps' toes, though processVV only expects to get the apps
-	 * that its application reads, so we only return those.
-	 * 
-	 * It should always hold that toReturn is a subset of toAcquire
-	 */
+	// We need to acquire both the views that we'll read
+	// and the ones we'll write, to avoid stepping on other
+	// apps' toes, though processVV only expects to get the apps
+	// that its application reads, so we only return those.
+	// 
+	// It should always hold that toReturn is a subset of toAcquire
+	
 	acquireViews(toAcquire);
 		
 	return ret;
     }
+    */
 	
     /** 
      * This method acquires all of the views in {@value toAcquire}.  It blocks
@@ -313,7 +317,7 @@ public class LocalEnv {
     }
 	
     public void clearLocal() {
-	local.clearViews();
+	//local.clearViews();
 	viewSemaphores.clear();
     }
 }
