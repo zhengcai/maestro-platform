@@ -49,10 +49,14 @@ public abstract class Driver {
      * Usually the ApplicationManager will decide whether the specific loop should be
      * suspended based on the number of current waiting DAG instances enqueued
      */
+    /*
     public void whetherContinue() {
+	if (!lock.locked)
+	    return;
 	synchronized (lock) {
 	    if (lock.locked) {
 		try {
+		    System.err.println("Waiting");
 		    lock.wait();
 		} catch (InterruptedException e) {
 		    System.err.println("Driver:whetherContinue: InterruptedException");
@@ -61,6 +65,7 @@ public abstract class Driver {
 	    }
 	}
     }
+    */
 	
     /**
      * Set the shouldContinue to be false, such that the loop which calls whetherContinue()
@@ -69,6 +74,13 @@ public abstract class Driver {
     public void suspend() {
 	synchronized(lock) {
 	    lock.locked = true;
+	    try {
+		//System.err.println("Waiting");
+		lock.wait();
+	    } catch (InterruptedException e) {
+		System.err.println("Driver:whetherContinue: InterruptedException");
+		e.printStackTrace();
+	    }
 	}
     }
 	
@@ -76,9 +88,14 @@ public abstract class Driver {
      * Resume the previously suspended loop in the driver that calls whetherContinue()
      */
     public boolean resume() {
+	//if (!lock.locked) {
+	    //System.err.println("Exiting notify");
+	    //return false;
+	//}
 	synchronized(lock) {
 	    if (lock.locked) {
 		lock.locked = false;
+		//System.err.println("Notifying");
 		lock.notify();
 		return true;
 	    }

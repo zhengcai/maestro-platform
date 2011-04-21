@@ -28,12 +28,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.LinkedList;
-import java.util.ArrayList;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.*;
 
 import events.Event;
 import events.openflow.FlowModEvent;
@@ -63,24 +59,22 @@ public class openflow extends Driver {
 	public SocketChannel channel = null;
 	public int bufferSize = 0;
 	public byte[] buffer = new byte[1024];
-	//public ByteBuffer outputBuffer;
 
 	public boolean chopping = false;
 	public boolean sending = false;
-
 	public int chances = 0;
 	public int skipped = 0;
 	public int totalSize = 0;
 	public int zeroes = 0;
 
 	public long totalProcessed = 0;
+	public long lastProcessed = 0;
 		
 	/** For those lldps received before the dpid of this switch is known */
 	private LinkedList<LLDPPacketInEvent> lldpQueue;
 		
 	public Switch() {
 	    lldpQueue = new LinkedList<LLDPPacketInEvent>();
-	    //outputBuffer = ByteBuffer.allocate(20000);
 	}
 
 	public int send(ByteBuffer pkt) {
@@ -131,8 +125,8 @@ public class openflow extends Driver {
      * Switch socket round-robin pool implementation
      */
     private static class SwitchRRPool {
-	private openflow of;
-	private ArrayList<Switch> pool = null;
+	public openflow of;
+	public ArrayList<Switch> pool = null;
 	private int currentPos = 0;
 
 	public SwitchRRPool(openflow o) {
@@ -154,6 +148,14 @@ public class openflow extends Driver {
 	    }
 	}
 
+	public void clearAndAdd(ArrayList<Switch> sws) {
+	    synchronized(pool) {
+		pool.clear();
+		pool.addAll(sws);
+		currentPos = 0;
+	    }
+	}
+
 	public Switch getSwitchAt(int idx) {
 	    if (idx >= pool.size())
 		return null;
@@ -172,14 +174,14 @@ public class openflow extends Driver {
 			sw = pool.get(currentPos);
 		    } catch (IndexOutOfBoundsException e) {
 			//. TODO: write logs in memory to disk here
-			Parameters.am.dataLogMgr.dumpLogs();
+			//Parameters.am.dataLogMgr.dumpLogs();
 			//of.print();
 			//System.err.println("System existing...");
-			Utilities.ForceExit(0);
+			//Utilities.ForceExit(0);
+			return null;
 		    }
 		    currentPos = (currentPos+1)%size;
 		    if (!sw.chopping) {
-			sw.chopping = true;
 			return sw;
 		    }
 		}
@@ -195,17 +197,25 @@ public class openflow extends Driver {
     }
 	
     private final static int BUFFERSIZE = 1024;
+    private final static int PENDING = 500;
 	
     private HashMap<Long, Switch> dpid2switch;
     private HashMap<SocketChannel, Switch> chnl2switch;
     private Selector s;
     private SwitchRRPool swRRPool;
+    private ArrayList<OpenFlowTask> workers;
+
+    public LinkedList<ArrayList<RawMessage>> msgsQueue;
 	
     public openflow() {
     	random = new Random();
     	dpid2switch = new HashMap<Long, Switch>();
     	chnl2switch = new HashMap<SocketChannel, Switch>();
 	swRRPool = new SwitchRRPool(this);
+	workers = new ArrayList<OpenFlowTask>();
+	if(Parameters.mode == 3) {
+	    msgsQueue = new LinkedList<ArrayList<RawMessage>>();
+	}
     }
     
     public int SendPktOut(long dpid, ByteBuffer pkt) {
@@ -239,12 +249,48 @@ public class openflow extends Driver {
 			if (k.isAcceptable()) {
 			    SocketChannel channel = ((ServerSocketChannel)k.channel()).accept();
 			    channel.configureBlocking(false);
-			    //SelectionKey clientKey = channel.register(s, SelectionKey.OP_READ);
+			    if (Parameters.mode == 3) {
+				SelectionKey clientKey = channel.register(s, SelectionKey.OP_READ);
+			    }
 			    Switch sw = new Switch();
 			    sw.channel = channel;
 			    chnl2switch.put(channel, sw);
 			    swRRPool.addSwitch(sw);
 			    sendHelloMessage(sw);
+			} else if (k.isReadable()) { //. Only reachable when Parameters.mode == 3
+			    //long before = System.nanoTime();
+			    Switch sw = chnl2switch.get((SocketChannel)k.channel());
+			    Utilities.Assert(sw.channel == k.channel(), "Channels do not match!");
+			    ByteBuffer buffer = ByteBuffer.allocate(BUFFERSIZE);
+			    int size = sw.channel.read(buffer);
+			    if (size == -1) {
+				sw.channel.close();
+				continue;
+			    } else if (size == 0) {
+				System.err.println("DAMN, 0");
+				continue;
+			    }
+			    //long after = System.nanoTime();
+			    //Parameters.t1 += after - before;
+			    //before = after;
+
+			    ArrayList<RawMessage> msgs = chopMessages(sw, buffer, size);
+			    if (msgs != null && msgs.size()>0) {
+				synchronized (msgsQueue) {
+				    msgsQueue.add(msgs);
+				    msgsQueue.notify();
+				}
+			    }
+			    //after = System.nanoTime();
+			    //Parameters.t2 += after - before;
+			    //before = after;
+
+			    while (msgsQueue.size() > PENDING) {
+				Thread.sleep(1);
+				//System.err.println("t1 "+Parameters.t1);
+				//System.err.println("t2 "+Parameters.t2);
+				//System.err.println("t3 "+Parameters.t3);
+			    }
 			}
 		    } catch (IOException e) {
 			e.printStackTrace();
@@ -257,6 +303,8 @@ public class openflow extends Driver {
 	} catch (IOException e) {
 	    System.err.println("IOException in Selector.open()");
 	    e.printStackTrace();
+	} catch (InterruptedException e) {
+	    e.printStackTrace();
 	}
     }
 
@@ -264,11 +312,13 @@ public class openflow extends Driver {
 	public byte[] buf;
 	public int start;
 	public int length;
+	public Switch sw;
 
-	public RawMessage(byte[] b, int s, int l) {
+	public RawMessage(byte[] b, int st, int len, Switch s) {
 	    buf = b;
-	    start = s;
-	    length = l;
+	    start = st;
+	    length = len;
+	    sw = s;
 	}
     }
 
@@ -286,7 +336,7 @@ public class openflow extends Driver {
 		Utilities.memcpy(b, sw.bufferSize, buf, bufPos, length-sw.bufferSize);                 
 		size -= (length-sw.bufferSize);                                              
 		bufPos += (length-sw.bufferSize);                                               
-		ret.add(new RawMessage(b, 0, length));
+		ret.add(new RawMessage(b, 0, length, sw));
 		sw.bufferSize = 0;                                                           
 	    } else {                                                                        
 		Utilities.memcpy(sw.buffer, sw.bufferSize, buf, bufPos, size);                                  
@@ -309,7 +359,7 @@ public class openflow extends Driver {
 		    Utilities.memcpy(b, sw.bufferSize, buf, bufPos, length-sw.bufferSize);                 
 		    size -= (length-sw.bufferSize);                                              
 		    bufPos += (length-sw.bufferSize);                                               
-		    ret.add(new RawMessage(b, 0, length));
+		    ret.add(new RawMessage(b, 0, length, sw));
 		    sw.bufferSize = 0;
 		} else {                                                                      
 		    Utilities.memcpy(sw.buffer, sw.bufferSize, buf, bufPos, size);                                
@@ -344,7 +394,7 @@ public class openflow extends Driver {
 	    }
 		
 	    //. buffer is not going to be shared among worker threads, so no need to copy
-	    ret.add(new RawMessage(buf, bufPos, length));
+	    ret.add(new RawMessage(buf, bufPos, length, sw));
 	    size -= length;                                                                 
 	    bufPos += length;                                                                  
 	}
@@ -598,7 +648,7 @@ public class openflow extends Driver {
     }
     
     @Override
-	public boolean commitEvent(ArrayList<Event> events) {
+    public boolean commitEvent(ArrayList<Event> events) {
 	if (events.size() == 0) {
 	    return true;
 	}
@@ -664,12 +714,6 @@ public class openflow extends Driver {
 	    return pkt;
     	}
     }
-	
-    /* For better paralizability of memory management,
-     * we do not do partition consolidation
-     */
-    //HashMap<Long, Partition> pendingPts = new HashMap<Long, Partition>();
-    
 	
     private boolean processToSpecificSwitchEvent(ArrayList<Event> events) {
 	// Assume that the dpids in "events" are the same
@@ -793,9 +837,11 @@ public class openflow extends Driver {
 	}
 
 	public void run() {
+	    if (Parameters.mode == 2) {
+		partition = new SwitchRRPool(of);
+	    }
 	    int workerID = Parameters.am.workerMgr.getCurrentWorkerID();
 	    ByteBuffer buffer = ByteBuffer.allocate(BUFFERSIZE);
-	    //ByteBuffer buffer = ByteBuffer.allocate(78*30);
 	    int voidRead = 0;
 	    int idx = 0;
 	    int trySkipped = 0;
@@ -808,176 +854,190 @@ public class openflow extends Driver {
 	    int batched = 0;
 	    long begin = 0, finish = 0;
 	    double lastScore = 0;
-	    int printFreq = 0;
 	    int count = 0;
 	    final int MaxSteps = 1000; //. Maximum IBT is MaxSteps*step
 	    final int HistoryWeight = 80; //. History value weighs 80%
-	    final long MaxDelay = 1000; //. MicroSecond
+	    final long MaxDelay = 5000; //. MicroSecond
 	    double[] history = new double[MaxSteps];
 	    long lastRound = System.nanoTime();
-
+	    long lastAssign = lastRound;
 	    LinkedList<Switch> skipped = new LinkedList<Switch>();
+	    
 	    while (true) {
-		/*
-		Switch sw = of.getRRPool().nextSwitch();
-		if (null == sw) {
-		    continue;
-		}
-		*/
-
 		Switch sw = null;
-		if (idx < of.getRRPool().getSize()) {
-		    sw = of.getRRPool().getSwitchAt(idx++);
-		}
-		if (null == sw) {
-		    if (skipped.size() == 0 || trySkipped >= HOWMANYTRIES) {
-			skipped.clear();
-			idx = 0;
-			trySkipped = 0;
-			/*
-			long now = System.nanoTime();
-			if (workerID == 1) {
-			    System.err.println((now-lastRound)/1000);
-			}
-			lastRound = now;
-			*/
-			continue;
-		    } else {
-			sw = skipped.removeFirst();
-			trySkipped ++;
+		if (Parameters.mode == 1) {
+		    if (idx < of.getRRPool().getSize()) {
+			sw = of.getRRPool().getSwitchAt(idx++);
 		    }
-		}
-
-		synchronized (sw) {
-		    if (sw.chopping) {
-			skipped.addLast(sw);
-			continue;
-		    }
-		    else
-			sw.chopping = true;
-		}
-		
-		long before = 0;
-		if (Parameters.warmuped) {
-		    sw.chances ++;
-		    //before = System.nanoTime();
-		}
-		
-		try {
-		    buffer.clear();
-		    int size = sw.channel.read(buffer);
-		    if (size == -1) {
-			sw.chopping = false;
-			handleLeftSwitch(sw);
-			continue;
-		    } else if (size == 0) {
-			if (Parameters.warmuped)
-			    sw.zeroes ++;
-			sw.chopping = false;
-			// Whether flush the batch if there is no pending requests left
-			voidRead ++;
-			if (voidRead > of.getRRPool().getSize()) {
-			    of.flush();
-			    voidRead = 0;
-			    batched = 0;
-			    increasing = false;
-			    congested = false;
-			}
-			continue;
-		    } else if (size == BUFFERSIZE) {
-			congested = true;
-		    }
-
-		    ArrayList<RawMessage> msgs = of.chopMessages(sw, buffer, size);
-		    sw.chopping = false;
-		    
-		    if (Parameters.warmuped) {
-			sw.totalSize += size;
-		    }
-
-		    if (of.toprint && sw.dpid == 60 && sw.totalSize >= 80000000) {
-			of.print();
-			of.toprint = false;
-		    }
-
-		    for (RawMessage msg : msgs) {
-			if (batched >= ibt) {
-			    if (of.dispatchPacket(sw, msg.buf, msg.start, msg.length, true)) {
-				long allTime = (System.nanoTime() - begin) / 1000; //. Microsecond
-				double score = ((double)batched) / (allTime);
-				//double score = ((double)(MaxDelay-allTime)*batched) / (MaxDelay*allTime);
-				
-				double realScore = score;
-				
-				//. Adding history into the evaluation
-				int hisIdx = ibt / step;
-				if (history[hisIdx] == 0) {
-				    history[hisIdx] = score;
-				} else {
-				    score = (score*(100-HistoryWeight) + history[hisIdx]*HistoryWeight) / 100;
-				    history[hisIdx] = score;
-				}
-				
-				
-				if (workerID == 1) {
-				    //System.err.println((count++)+" "+ibt+" "+increasing+" "+score+" ("+realScore+") "+lastScore+" "+allTime);
-				    /*
-				    System.err.println(Parameters.newCountfm+" "+
-						       Parameters.newCountpi+" "+
-						       Parameters.newCountpo+" "+
-						       Parameters.newCountdata+" "+
-						       Parameters.newCountbuffer+" "+
-						       Parameters.newCountdr);
-				    */
-				}
-
-				
-				if (allTime > MaxDelay) {
-				    increasing = false;
-				    if (ibt <= step)
-					ibt = step;
-				    else
-					ibt -= step;
-				} else {
-				
-				    if (score > lastScore) { //. Better
-					if (increasing && congested) {
-					    ibt += step;
-					    if (ibt > maxIbt)
-						maxIbt = ibt;
-					} else {
-					    if (ibt <= step)
-						ibt = step;
-					    else
-						ibt -= step;
-					}
-				    } else { //. Worse
-					increasing = !increasing;
-				    }
-				}
-
-				//ibt = 1000;
-				lastScore = score;
-				congested = false;
-				
-				batched = 0;
-			    }
+		    if (null == sw) {
+			if (skipped.size() == 0 || trySkipped >= HOWMANYTRIES) {
+			    skipped.clear();
+			    idx = 0;
+			    trySkipped = 0;
+			    /*
+			      long now = System.nanoTime();
+			      if (workerID == 1) {
+			      System.err.println((now-lastRound)/1000);
+			      }
+			      lastRound = now;
+			    */
+			    continue;
 			} else {
-			    batched += of.dispatchPacket(sw, msg.buf, msg.start, msg.length, false) ? 1 : 0;
-			    if (batched == 1) {
-				begin = System.nanoTime();
-			    }
+			    sw = skipped.removeFirst();
+			    trySkipped ++;
 			}
 		    }
 		    
-		    voidRead = 0;
-		} catch (IOException e) {
-		    //e.printStackTrace();
-		    //of.print();
-		    handleLeftSwitch(sw);
+		    synchronized (sw) {
+			if (sw.chopping) {
+			    skipped.addLast(sw);
+			    continue;
+			}
+			else
+			    sw.chopping = true;
+		    }
+		} else if (Parameters.mode == 2) {
+		    sw = partition.nextSwitch();
+
+		    if (workerID == 0) {
+			long now = System.nanoTime();
+			if ((now-lastAssign) > 2000000000) {
+			    lastAssign = now;
+			    of.reassignSwitches();
+			}
+		    }
+		    
+		    if (null == sw) {
+			continue;
+		    }
+
+		    synchronized (sw) {
+			if (!sw.chopping)
+			    sw.chopping = true;
+		    }		    
 		}
-	    }
-	}
+		
+		ArrayList<RawMessage> msgs = null;
+
+		if(Parameters.mode == 1 || Parameters.mode == 2) {
+		    try {
+			buffer.clear();
+			int size = sw.channel.read(buffer);
+			if (size == -1) {
+			    sw.chopping = false;
+			    handleLeftSwitch(sw);
+			    continue;
+			} else if (size == 0) {
+			    if (Parameters.warmuped)
+				sw.zeroes ++;
+			    sw.chopping = false;
+			    // Whether flush the batch if there is no pending requests left
+			    voidRead ++;
+			    if (voidRead > of.getRRPool().getSize()) {
+				of.flush();
+				voidRead = 0;
+				batched = 0;
+				increasing = false;
+				congested = false;
+			    }
+			    continue;
+			} else if (size == BUFFERSIZE) {
+			    congested = true;
+			}
+			
+			msgs = of.chopMessages(sw, buffer, size);
+			sw.chopping = false;
+			
+			if (Parameters.warmuped) {
+			    sw.totalSize += size;
+			}
+			voidRead = 0;
+		    } catch (IOException e) {
+			//e.printStackTrace();
+			//of.print();
+			handleLeftSwitch(sw);
+		    }
+		} else if(Parameters.mode == 3) {
+		    synchronized (of.msgsQueue) {
+			while (of.msgsQueue.isEmpty()) {
+			    try {
+				of.msgsQueue.wait();
+			    } catch (InterruptedException ignored) {
+				
+			    }
+			}
+			msgs = of.msgsQueue.removeFirst();
+		    }
+		}
+
+		for (RawMessage msg : msgs) {
+		    if (batched >= ibt) {
+			if (of.dispatchPacket(msg.sw, msg.buf, msg.start, msg.length, true)) {
+			    long allTime = (System.nanoTime() - begin) / 1000; //. Microsecond
+			    double score = ((double)batched) / (allTime);
+			    //double score = ((double)(MaxDelay-allTime)*batched) / (MaxDelay*allTime);
+			    
+			    double realScore = score;
+			    //. Adding history into the evaluation
+			    int hisIdx = ibt / step;
+			    if (history[hisIdx] == 0) {
+				history[hisIdx] = score;
+			    } else {
+				score = (score*(100-HistoryWeight) + history[hisIdx]*HistoryWeight) / 100;
+				history[hisIdx] = score;
+			    }
+			    
+			    
+			    if (workerID == 1) {
+				//System.err.println((count++)+" "+ibt+" "+increasing+" "+score+" ("+realScore+") "+lastScore+" "+allTime);
+				/*
+				  System.err.println(Parameters.newCountfm+" "+
+				  Parameters.newCountpi+" "+
+				  Parameters.newCountpo+" "+
+				  Parameters.newCountdata+" "+
+				  Parameters.newCountbuffer+" "+
+				  Parameters.newCountdr);
+				*/
+			    }
+			    
+			    
+			    if (allTime > MaxDelay) {
+				increasing = false;
+				if (ibt <= step)
+				    ibt = step;
+				else
+				    ibt -= step;
+			    } else {
+				
+				if (score > lastScore) { //. Better
+				    if (increasing && congested) {
+					ibt += step;
+					if (ibt > maxIbt)
+					    maxIbt = ibt;
+				    } else {
+					if (ibt <= step)
+					    ibt = step;
+					else
+					    ibt -= step;
+				    }
+				} else { //. Worse
+				    increasing = !increasing;
+				}
+			    }
+			    
+			    lastScore = score;
+			    congested = false;
+			    batched = 0;
+			}
+		    } else {
+			batched += of.dispatchPacket(msg.sw, msg.buf, msg.start, msg.length, false) ? 1 : 0;
+			if (batched == 1) {
+			    begin = System.nanoTime();
+			}
+		    }
+		} //. End of for loop
+	    } //. End of while loop
+	} //. End of run1()
 
 	public void handleLeftSwitch(Switch sw) {
 	    try {
@@ -987,15 +1047,98 @@ public class openflow extends Driver {
 		
 	    }
 	    of.getRRPool().removeSwitch(sw);
+	    if (partition != null)
+		partition.removeSwitch(sw);
 	    //. TODO: write logs in memory to disk here
 	    Parameters.am.dataLogMgr.dumpLogs();
 
 	    //. TODO: Generate a switch leave event
 	}
+
+	private SwitchRRPool partition = null;
+    }
+
+    public void reassignSwitches() {
+	class SwitchLoad implements Comparable<SwitchLoad> {
+	    public long load;
+	    public Switch sw;
+	    
+	    public SwitchLoad(long l, Switch s) {
+		load = l;
+		sw = s;
+	    }
+
+	    public int compareTo(SwitchLoad other) {
+		if (load > other.load)
+		    return 1;
+		else if (load < other.load)
+		    return -1;
+		else
+		    return 0;
+	    }
+	}
+	
+	ArrayList<SwitchLoad> loads = new ArrayList<SwitchLoad>();
+	synchronized(swRRPool.pool) {
+	    for(Switch sw : swRRPool.pool) {
+		loads.add(new SwitchLoad(sw.totalProcessed-sw.lastProcessed, sw));
+		sw.lastProcessed = sw.totalProcessed;
+	    }
+	}
+
+	Collections.sort(loads);
+
+	class LoadAssignment implements Comparable<LoadAssignment> {
+	    public long assigned = 0;
+	    public OpenFlowTask worker = null;
+	    public ArrayList<Switch> toAdd = null;
+
+	    public LoadAssignment(OpenFlowTask w) {
+		worker = w;
+		toAdd = new ArrayList<Switch>();
+	    }
+
+	    public int compareTo(LoadAssignment other) {
+		if (assigned > other.assigned)
+		    return 1;
+		else if (assigned < other.assigned)
+		    return -1;
+		else
+		    return 0;
+	    }
+
+	    public void addLoad(SwitchLoad load) {
+		assigned += load.load;
+		toAdd.add(load.sw);
+	    }
+	}
+	
+	PriorityQueue<LoadAssignment> assignment = new PriorityQueue<LoadAssignment>();
+	synchronized(workers) {
+	    for(OpenFlowTask w : workers) {
+		assignment.add(new LoadAssignment(w));
+	    }
+	}
+
+	int n = loads.size();
+	for(int i=0;i<n;i++) {
+	    SwitchLoad sl = loads.get(n-i-1);
+	    LoadAssignment a = assignment.poll();
+	    a.addLoad(sl);
+	    assignment.add(a);
+	}
+
+	for(LoadAssignment a : assignment) {
+	    a.worker.partition.clearAndAdd(a.toAdd);
+	}	
     }
     
     public Runnable newTask() {
-	return new OpenFlowTask(this);
+	OpenFlowTask ret = new OpenFlowTask(this);
+	synchronized(workers) {
+	    workers.add(ret);
+	}
+	return ret;
     }
 
     public void prepareDriverPage(ByteBuffer buffer) {

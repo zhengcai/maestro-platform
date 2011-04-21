@@ -55,6 +55,8 @@ public class Parameters {
 	
     public static boolean measurePerf = false;
 
+    public static int mode = 3; //. 1 for round-robin, 2 for partition, 3 for selector
+
     public static long newCountfm = 0;
     public static long newCountpi = 0;
     public static long freeCountpi = 0;
