@@ -29,8 +29,10 @@ import java.io.*;
  * so the concurrency overhead is minimized
  * @author Zheng Cai
  */
-public class DataLogManager {
+public class DataLogManager extends Thread {
     public static final boolean enabled = false;
+
+    public static final int MILLISEC_SLEEP = 100;
     
     public static abstract class Content {
 	public abstract String toString();
@@ -56,8 +58,24 @@ public class DataLogManager {
     private boolean dumpDone = false;
 
     public DataLogManager(WorkerManager m) {
-	logs = new ArrayList<ArrayList<Entry>>();
-	mgr = m;
+	if (enabled) {
+	    logs = new ArrayList<ArrayList<Entry>>();
+	    mgr = m;
+	}
+	else
+	    start();
+    }
+
+    public void run() {
+	while (true) {
+	    try {
+		Thread.sleep(MILLISEC_SLEEP);
+	    } catch (InterruptedException e) {
+
+	    }
+	    if (Parameters.warmuped)
+		Utilities.log.println(Parameters.am.vm.driver.getCounters());
+	}
     }
 
     /**

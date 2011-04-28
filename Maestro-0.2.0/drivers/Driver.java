@@ -126,6 +126,8 @@ public abstract class Driver {
      */
     abstract public void prepareDriverPage(ByteBuffer buffer);
 
+    abstract public String getCounters();
+
     /**
      * Let the driver return a new Runnable task,
      * for each worker thread to work on

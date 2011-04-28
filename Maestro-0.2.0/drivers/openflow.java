@@ -68,6 +68,7 @@ public class openflow extends Driver {
 	public int zeroes = 0;
 
 	public long totalProcessed = 0;
+	public long poPushed = 0;
 	public long lastProcessed = 0;
 		
 	/** For those lldps received before the dpid of this switch is known */
@@ -280,6 +281,8 @@ public class openflow extends Driver {
 				    msgsQueue.add(msgs);
 				    msgsQueue.notify();
 				}
+				sw.totalProcessed += msgs.size();
+				Parameters.totalProcessed += msgs.size();
 			    }
 			    //after = System.nanoTime();
 			    //Parameters.t2 += after - before;
@@ -674,7 +677,6 @@ public class openflow extends Driver {
 	}
 	if (e instanceof FlowModEvent) {
 	    return processToSpecificSwitchEvent(events);
-	    //return true;
 	}
 	return true;
     }
@@ -788,9 +790,8 @@ public class openflow extends Driver {
 	    of.pendingPts.remove(pt.dpid);
 	    }
 	    */
-	    if ( pt.es.get(0) instanceof PacketOutEvent)
-		target.totalProcessed += pt.es.size();
-	    
+
+	    int size = pt.es.size();
 	    if (Parameters.batchOutput) {
 		ByteBuffer pkt = pt.toPacket();
 		SendPktOut(pt.dpid, pkt);
@@ -814,6 +815,12 @@ public class openflow extends Driver {
 		    }
 		}
 	    }
+
+	    
+	    if ( pt.es.get(0) instanceof PacketOutEvent) {
+		target.poPushed += size;
+	    }
+	    
 	    
 	    pt.es.clear();
 	}
@@ -824,8 +831,8 @@ public class openflow extends Driver {
     public void print() {
 	for (long i=1;i<=60;i++) {
 	    Switch sw = dpid2switch.get(i);
-	    if (sw.totalSize > 0)
-		System.err.println("Switch # "+i+" chances "+sw.chances+" processed "+sw.totalProcessed+" totalSize "+sw.totalSize+" zeroes "+sw.zeroes);
+	    if (sw.totalSize > 100000)
+		System.err.println("Switch # "+i+" chances "+sw.chances+" processed "+sw.totalProcessed+" POpushed "+sw.poPushed+" totalSize "+sw.totalSize+" zeroes "+sw.zeroes);
 	}
     }
 
@@ -845,7 +852,7 @@ public class openflow extends Driver {
 	    int voidRead = 0;
 	    int idx = 0;
 	    int trySkipped = 0;
-	    final int HOWMANYTRIES = 40;
+	    final int HOWMANYTRIES = 20;
 	    int ibt = Parameters.batchInputNum;
 	    int maxIbt = Parameters.batchInputNum;
 	    final int step = 10;
@@ -871,21 +878,25 @@ public class openflow extends Driver {
 		    }
 		    if (null == sw) {
 			if (skipped.size() == 0 || trySkipped >= HOWMANYTRIES) {
-			    skipped.clear();
+			    //skipped.clear();
 			    idx = 0;
 			    trySkipped = 0;
 			    /*
-			      long now = System.nanoTime();
-			      if (workerID == 1) {
-			      System.err.println((now-lastRound)/1000);
-			      }
-			      lastRound = now;
+			    long now = System.nanoTime();
+			    if (workerID == 0 && Parameters.warmuped) {
+				System.err.println((now-lastRound)/1000);
+			    }
+			    lastRound = now;
 			    */
 			    continue;
 			} else {
 			    sw = skipped.removeFirst();
 			    trySkipped ++;
 			}
+		    }
+
+		    if (skipped.size() > 50) {
+			skipped.clear();
 		    }
 		    
 		    synchronized (sw) {
@@ -920,6 +931,8 @@ public class openflow extends Driver {
 		ArrayList<RawMessage> msgs = null;
 
 		if(Parameters.mode == 1 || Parameters.mode == 2) {
+		    if (Parameters.warmuped)
+			sw.chances ++;
 		    try {
 			buffer.clear();
 			int size = sw.channel.read(buffer);
@@ -948,10 +961,12 @@ public class openflow extends Driver {
 			msgs = of.chopMessages(sw, buffer, size);
 			sw.chopping = false;
 			
-			if (Parameters.warmuped) {
+			//if (Parameters.warmuped) {
 			    sw.totalSize += size;
-			}
+			    //}
 			voidRead = 0;
+			sw.totalProcessed += msgs.size();
+			Parameters.totalProcessed += msgs.size();
 		    } catch (IOException e) {
 			//e.printStackTrace();
 			//of.print();
@@ -1036,6 +1051,12 @@ public class openflow extends Driver {
 			}
 		    }
 		} //. End of for loop
+
+		if (Parameters.totalProcessed > 40000000 && workerID == 1) {
+		    of.print();
+		    Parameters.am.dataLogMgr.dumpLogs();
+		    Utilities.ForceExit(0);
+		}
 	    } //. End of while loop
 	} //. End of run1()
 
@@ -1050,7 +1071,7 @@ public class openflow extends Driver {
 	    if (partition != null)
 		partition.removeSwitch(sw);
 	    //. TODO: write logs in memory to disk here
-	    Parameters.am.dataLogMgr.dumpLogs();
+	    //Parameters.am.dataLogMgr.dumpLogs();
 
 	    //. TODO: Generate a switch leave event
 	}
@@ -1151,5 +1172,15 @@ public class openflow extends Driver {
 	    }
 	}
 	buffer.flip();
+    }
+
+    public String getCounters() {
+	String ret = ""+System.nanoTime();
+	synchronized(dpid2switch) {
+	    for (Switch sw : dpid2switch.values()) {
+		ret += String.format(" %d %d", sw.dpid, sw.totalProcessed);
+	    }
+	}
+	return ret;
     }
 }

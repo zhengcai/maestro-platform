@@ -67,8 +67,10 @@ public class Main {
 		    Parameters.listenPort = Integer.parseInt(words[1]);
 		} else if (words[0].compareToIgnoreCase("daemonPort") == 0) {
 		    Parameters.daemonPort = Integer.parseInt(words[1]);
+		} else if (words[0].compareToIgnoreCase("mode") == 0) {
+		    Parameters.mode = Integer.parseInt(words[1]);
 		} else {
-		    
+
 		}
 	    } //. End of while
 	} //. End of try

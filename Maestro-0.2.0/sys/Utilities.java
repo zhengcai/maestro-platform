@@ -56,6 +56,7 @@ public class Utilities {
     }
 
     public static void ForceExit(int status) {
+	closeLogFile();
 	Exception e = new Exception();
 	e.printStackTrace();
 	System.exit(status);

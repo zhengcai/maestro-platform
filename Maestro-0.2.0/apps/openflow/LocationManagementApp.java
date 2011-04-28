@@ -61,7 +61,7 @@ public class LocationManagementApp extends App {
 		    return String.format("%d %d\n", dpid, size);
 		}
 	    }
-	    if (Parameters.am.dataLogMgr.enabled && pi.reason == 1) {
+	    if (pi.reason == 1) {
 		if (!Parameters.warmuped) {
 		    Parameters.warmuped = true;
 		    //Parameters.am.dataLogMgr.addEntry(new LogContent(pi.dpid, -1));
