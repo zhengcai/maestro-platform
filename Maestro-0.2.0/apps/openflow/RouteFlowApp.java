@@ -67,7 +67,7 @@ public class RouteFlowApp extends App {
 			//. Make sure the inport and outport are different
 			if (pi.inPort != pi.dst.port) {
 			    //. Add the flow entry
-			    config.addFlowModEvent(createFlowModAdd(pi, from, pi.dst.port));
+			    //config.addFlowModEvent(createFlowModAdd(pi, from, pi.dst.port));
 			    addPacketOut(pi, pi.dst.port, pkts);
 			}
 		    }
@@ -78,7 +78,7 @@ public class RouteFlowApp extends App {
 			
 		long next = rtv.next;
 		while (current != to) {
-		    config.addFlowModEvent(createFlowModAdd(pi, current, rtv.port));
+		    //config.addFlowModEvent(createFlowModAdd(pi, current, rtv.port));
 		    rtv = rt.getNextHop(next, to);
 		    //. Still in transient state
 		    if (rtv == null) {

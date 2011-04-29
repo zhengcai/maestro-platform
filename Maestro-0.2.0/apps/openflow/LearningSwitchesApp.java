@@ -59,22 +59,27 @@ public class LearningSwitchesApp extends App {
 	ArrayList<PacketInEvent> work = pis.incoming;
 		
 	for (PacketInEvent pi : work) {
-	    /*
+	    if (pi.reason == 1) {
+		if (!Parameters.warmuped) {
+		    Parameters.warmuped = true;
+		}
+	    }
+	    
 	    try {
 		macs.addMACLocation(pi.dpid, pi.flow.dlSrc, pi.inPort);
-		
+		/*
 		Utilities.printlnDebug("Learning "+String.format("MAC %d-%d-%d-%d-%d-%d",
 								 pi.flow.dlSrc[0], pi.flow.dlSrc[1], pi.flow.dlSrc[2],
 								 pi.flow.dlSrc[3], pi.flow.dlSrc[4], pi.flow.dlSrc[5])
 				       +" at "+pi.dpid+" ("+pi.inPort+")");
-		
+		*/
 	    } catch (NullPointerException e) {
 		continue;
 	    }
 	    
 	    Short outPort = macs.getMACLocation(pi.dpid, pi.flow.dlDst);
-	    */
-	    Short outPort = null;
+	    
+	    //Short outPort = null;
 	    if (null != outPort) {
 		FlowModEvent fm = null;
 		if (Parameters.useMemoryMgnt) {
