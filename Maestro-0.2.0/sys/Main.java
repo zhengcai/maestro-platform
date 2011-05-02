@@ -38,6 +38,7 @@ public class Main {
 	try {
 	    BufferedReader input = new BufferedReader(new FileReader(configFile));
 	    String line = null;
+	    String outputLog = "log.txt";
 	    while ((line = input.readLine()) != null) {
 		line = Utilities.TrimConfigString(line);
 		String[] words = line.split(" ");
@@ -59,8 +60,9 @@ public class Main {
 		    Parameters.countDone = Integer.parseInt(words[1]);
 		} else if (words[0].compareToIgnoreCase("queueUpperBound") == 0) {
 		    Parameters.queueUpperBound = Integer.parseInt(words[1]);
-		    } */else if (words[0].compareToIgnoreCase("outputLog") == 0) {
-		    Utilities.openLogFile(words[1]);
+		    } */
+		else if (words[0].compareToIgnoreCase("outputLog") == 0) {
+		    outputLog = words[1];
 		} else if (words[0].compareToIgnoreCase("dataLogFile") == 0) {
 		    Parameters.dataLogFile = words[1];
 		} else if (words[0].compareToIgnoreCase("port") == 0) {
@@ -73,6 +75,7 @@ public class Main {
 
 		}
 	    } //. End of while
+	    Utilities.openLogFile(outputLog);
 	} //. End of try
 	catch (FileNotFoundException e) {
 	    Utilities.Assert(false, "Configuration File Not Found!");

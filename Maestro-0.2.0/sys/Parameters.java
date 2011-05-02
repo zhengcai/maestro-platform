@@ -34,7 +34,7 @@ public class Parameters {
      */
     public static boolean printDebug = true;
 	
-    public static int batchInputNum = 4;
+    public static int batchInputNum = 200;
     
     public static boolean batchOutput = true;
     public static int divide = 1;
@@ -95,9 +95,9 @@ public class Parameters {
     public static long waiting = 0;
     public static long running = 0;
 
-    public static int listenPort = 0;
-    public static int daemonPort = 0;
+    public static int listenPort = 6633;
+    public static int daemonPort = 8080;
 
     public static int consoleMode = 0;
-    public static String dataLogFile = null;
+    public static String dataLogFile = "datalog.txt";
 }

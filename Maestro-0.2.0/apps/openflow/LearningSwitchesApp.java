@@ -64,22 +64,24 @@ public class LearningSwitchesApp extends App {
 		    Parameters.warmuped = true;
 		}
 	    }
-	    
+
+
 	    try {
 		macs.addMACLocation(pi.dpid, pi.flow.dlSrc, pi.inPort);
-		/*
+		/*		
 		Utilities.printlnDebug("Learning "+String.format("MAC %d-%d-%d-%d-%d-%d",
 								 pi.flow.dlSrc[0], pi.flow.dlSrc[1], pi.flow.dlSrc[2],
 								 pi.flow.dlSrc[3], pi.flow.dlSrc[4], pi.flow.dlSrc[5])
 				       +" at "+pi.dpid+" ("+pi.inPort+")");
-		*/
+		*/	    
 	    } catch (NullPointerException e) {
 		continue;
 	    }
 	    
 	    Short outPort = macs.getMACLocation(pi.dpid, pi.flow.dlDst);
-	    
+
 	    //Short outPort = null;
+	    /*
 	    if (null != outPort) {
 		FlowModEvent fm = null;
 		if (Parameters.useMemoryMgnt) {
@@ -113,6 +115,7 @@ public class LearningSwitchesApp extends App {
 		
 		config.addFlowModEvent(fm);
 	    }
+	    */
 	    
 	    if (null == outPort || OFPConstants.OP_UNBUFFERED_BUFFER_ID == pi.bufferId) {
 		PacketOutEvent po;

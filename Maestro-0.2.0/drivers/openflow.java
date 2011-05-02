@@ -58,7 +58,7 @@ public class openflow extends Driver {
 	public long dpid = 0;
 	public SocketChannel channel = null;
 	public int bufferSize = 0;
-	public byte[] buffer = new byte[1024];
+	public byte[] buffer = new byte[2048];
 
 	public boolean chopping = false;
 	public boolean sending = false;
@@ -257,7 +257,7 @@ public class openflow extends Driver {
 			    sw.channel = channel;
 			    chnl2switch.put(channel, sw);
 			    swRRPool.addSwitch(sw);
-			    sendHelloMessage(sw);
+			    //sendHelloMessage(sw);
 			} else if (k.isReadable()) { //. Only reachable when Parameters.mode == 3
 			    //long before = System.nanoTime();
 			    Switch sw = chnl2switch.get((SocketChannel)k.channel());
@@ -1005,17 +1005,9 @@ public class openflow extends Driver {
 			    
 			    if (workerID == 1) {
 				//System.err.println((count++)+" "+ibt+" "+increasing+" "+score+" ("+realScore+") "+lastScore+" "+allTime);
-				/*
-				  System.err.println(Parameters.newCountfm+" "+
-				  Parameters.newCountpi+" "+
-				  Parameters.newCountpo+" "+
-				  Parameters.newCountdata+" "+
-				  Parameters.newCountbuffer+" "+
-				  Parameters.newCountdr);
-				*/
 			    }
 			    
-			    
+
 			    if (allTime > MaxDelay) {
 				increasing = false;
 				if (ibt <= step)
@@ -1039,6 +1031,7 @@ public class openflow extends Driver {
 				    increasing = !increasing;
 				}
 			    }
+
 			    
 			    lastScore = score;
 			    congested = false;
