@@ -21,6 +21,7 @@
 package drivers;
 
 import java.io.IOException;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -203,6 +204,7 @@ public class openflow extends Driver {
     private HashMap<Long, Switch> dpid2switch;
     private HashMap<SocketChannel, Switch> chnl2switch;
     private Selector s;
+    private static Selector readSelector;
     private SwitchRRPool swRRPool;
     private ArrayList<OpenFlowTask> workers;
 
@@ -234,6 +236,7 @@ public class openflow extends Driver {
     	try {
 	    int port = Parameters.listenPort;
 	    s = Selector.open();
+	    readSelector = Selector.open();
 	    ServerSocketChannel acceptChannel = ServerSocketChannel.open();
 	    acceptChannel.configureBlocking(false);
 	    byte[] ip = {0, 0, 0, 0};
@@ -252,13 +255,15 @@ public class openflow extends Driver {
 			    channel.configureBlocking(false);
 			    if (Parameters.mode == 3) {
 				SelectionKey clientKey = channel.register(s, SelectionKey.OP_READ);
+			    } else {
+				SelectionKey clientKey = channel.register(readSelector, SelectionKey.OP_READ);
 			    }
 			    Switch sw = new Switch();
 			    sw.channel = channel;
 			    chnl2switch.put(channel, sw);
 			    swRRPool.addSwitch(sw);
 			    //sendHelloMessage(sw);
-			} else if (k.isReadable()) { //. Only reachable when Parameters.mode == 3
+			} else if (Parameters.mode == 3 && k.isReadable()) { //. Only reachable when Parameters.mode == 3
 			    //long before = System.nanoTime();
 			    Switch sw = chnl2switch.get((SocketChannel)k.channel());
 			    Utilities.Assert(sw.channel == k.channel(), "Channels do not match!");
@@ -855,7 +860,10 @@ public class openflow extends Driver {
 	    final int HOWMANYTRIES = 20;
 	    int ibt = Parameters.batchInputNum;
 	    int maxIbt = Parameters.batchInputNum;
-	    final int step = 10;
+	    double bestScore = 0;
+	    int bestIbt = 0;
+	    long bestDelayForScore = 0;
+	    final int step = 20;
 	    boolean congested = false;
 	    boolean increasing = true;
 	    int batched = 0;
@@ -864,11 +872,31 @@ public class openflow extends Driver {
 	    int count = 0;
 	    final int MaxSteps = 1000; //. Maximum IBT is MaxSteps*step
 	    final int HistoryWeight = 80; //. History value weighs 80%
-	    final long MaxDelay = 5000; //. MicroSecond
+	    final long MaxDelay = Parameters.maxDelay; //. MicroSecond
 	    double[] history = new double[MaxSteps];
 	    long lastRound = System.nanoTime();
 	    long lastAssign = lastRound;
 	    LinkedList<Switch> skipped = new LinkedList<Switch>();
+
+	    
+	    PrintWriter ibtlog = null;
+	    try {
+		ibtlog = new PrintWriter(new File("ibtlog.txt"));
+	    } catch (FileNotFoundException e) {
+		System.err.println("Not found!!!!!!!!");
+	    }
+	    PrintWriter delaylog = null;
+	    try {
+		delaylog = new PrintWriter(new File("delaylog.txt"));
+	    } catch (FileNotFoundException e) {
+		System.err.println("Not found!!!!!!!!");
+	    }
+	    long lastPrint = 0;
+	    int timeStamp = 1;
+	    boolean stepOne = true;
+	    boolean stepTwo = true;
+	    boolean stepThree = true;
+	    boolean stepFour = true;
 	    
 	    while (true) {
 		Switch sw = null;
@@ -877,6 +905,35 @@ public class openflow extends Driver {
 			sw = of.getRRPool().getSwitchAt(idx++);
 		    }
 		    if (null == sw) {
+			/* //. Not good select code for flushing
+			try {
+			    if (Parameters.useIBTAdaptation &&
+				readSelector != null &&
+				readSelector.selectNow() <= 0) {
+				
+				skipped.clear();
+				idx = 0;
+				trySkipped = 0;
+				
+				of.flush();
+				voidRead = 0;
+				batched = 0;
+				increasing = false;
+				congested = false;
+				
+				int myStep = step << 1 + step >> 1;
+				if (ibt <= myStep)
+				    ibt = step;
+				else
+				    ibt -= myStep;
+				
+				continue;
+			    }
+			} catch (IOException e) {
+
+			}
+			*/
+			
 			if (skipped.size() == 0 || trySkipped >= HOWMANYTRIES) {
 			    //skipped.clear();
 			    idx = 0;
@@ -909,6 +966,30 @@ public class openflow extends Driver {
 		    }
 		} else if (Parameters.mode == 2) {
 		    sw = partition.nextSwitch();
+		    
+		    /* //. Not good select code for flushing
+		    idx ++;
+		    if (Parameters.useIBTAdaptation && idx > partition.getSize()) {
+			idx = 0;
+			try {
+			    if (readSelector != null && readSelector.selectNow() <= 0) {
+				of.flush();
+				voidRead = 0;
+				batched = 0;
+				increasing = false;
+				congested = false;
+				
+				int myStep = step << 1 + step >> 1;
+				if (ibt <= myStep)
+				    ibt = step;
+				else
+				    ibt -= myStep;
+			    }
+			} catch (IOException e) {
+			    
+			}
+		    }
+		    */
 
 		    if (workerID == 0) {
 			long now = System.nanoTime();
@@ -944,15 +1025,26 @@ public class openflow extends Driver {
 			    if (Parameters.warmuped)
 				sw.zeroes ++;
 			    sw.chopping = false;
+
+			    
 			    // Whether flush the batch if there is no pending requests left
 			    voidRead ++;
-			    if (voidRead > of.getRRPool().getSize()) {
-				of.flush();
-				voidRead = 0;
-				batched = 0;
-				increasing = false;
-				congested = false;
+			    if (Parameters.useIBTAdaptation) {
+				if (voidRead > (of.getRRPool().getSize()) && batched > 0) {
+				    of.flush();
+				    voidRead = 0;
+				    batched = 0;
+				    increasing = false;
+				    congested = false;
+				    
+				    int myStep = step << 1 + step >> 1;
+				    if (ibt <= myStep)
+					ibt = step;
+				    else
+					ibt -= myStep;
+				}
 			    }
+			    
 			    continue;
 			} else if (size == BUFFERSIZE) {
 			    congested = true;
@@ -961,9 +1053,7 @@ public class openflow extends Driver {
 			msgs = of.chopMessages(sw, buffer, size);
 			sw.chopping = false;
 			
-			//if (Parameters.warmuped) {
-			    sw.totalSize += size;
-			    //}
+			sw.totalSize += size;
 			voidRead = 0;
 			sw.totalProcessed += msgs.size();
 			Parameters.totalProcessed += msgs.size();
@@ -975,6 +1065,18 @@ public class openflow extends Driver {
 		} else if(Parameters.mode == 3) {
 		    synchronized (of.msgsQueue) {
 			while (of.msgsQueue.isEmpty()) {
+			    if (Parameters.useIBTAdaptation && batched > 0) {
+				of.flush();
+				batched = 0;
+				increasing = false;
+				congested = false;
+
+				int myStep = step << 1 + step >> 1;
+				if (ibt <= myStep)
+				    ibt = step;
+				else
+				    ibt -= myStep;
+			    }
 			    try {
 				of.msgsQueue.wait();
 			    } catch (InterruptedException ignored) {
@@ -988,9 +1090,11 @@ public class openflow extends Driver {
 		for (RawMessage msg : msgs) {
 		    if (batched >= ibt) {
 			if (of.dispatchPacket(msg.sw, msg.buf, msg.start, msg.length, true)) {
-			    long allTime = (System.nanoTime() - begin) / 1000; //. Microsecond
+			    long now = System.nanoTime();
+			    long allTime = (now - begin) / 1000; //. Microsecond
 			    double score = ((double)batched) / (allTime);
-			    //double score = ((double)(MaxDelay-allTime)*batched) / (MaxDelay*allTime);
+			    //double score = ((double)(5000-allTime)*batched) / (5000*allTime);
+			    //double score = ((double)batched*10000) / (allTime) - ((double)allTime);
 			    
 			    double realScore = score;
 			    //. Adding history into the evaluation
@@ -1003,53 +1107,114 @@ public class openflow extends Driver {
 			    }
 			    
 			    
-			    if (workerID == 1) {
-				//System.err.println((count++)+" "+ibt+" "+increasing+" "+score+" ("+realScore+") "+lastScore+" "+allTime);
+			    if (Parameters.dynamicExp && Parameters.warmuped && workerID == 0) {
+				if ((now - lastPrint) > 10000000L) {
+				    //System.err.println(ibt+" "+increasing+" "+score+" ("+realScore+") "+lastScore+" "+allTime+" || best "+bestScore+" at "+bestDelayForScore);
+				    ibtlog.println((timeStamp++)*10+" "+ibt);
+				    ibtlog.flush();
+				}
+				
+				if (Parameters.whenWarmuped != 0) {
+				    if (stepOne && (now - Parameters.whenWarmuped) > 10000000000L) {
+					Parameters.bufferId = 3;
+					ibtlog.println("Now starting rate 3");
+					System.err.println("Now starting rate 3");
+					stepOne = false;
+				    }
+
+				    if (stepTwo && (now - Parameters.whenWarmuped) > 20000000000L) {
+					Parameters.bufferId = 6;
+					ibtlog.println("Now starting rate 6");
+					System.err.println("Now starting rate 6");
+					stepTwo = false;
+				    }
+
+				    if (stepThree && (now - Parameters.whenWarmuped) > 30000000000L) {
+					Parameters.bufferId = 3;
+					ibtlog.println("Now starting rate 3");
+					System.err.println("Now starting rate 3");
+					stepThree = false;
+				    }
+
+				    if (stepFour && (now - Parameters.whenWarmuped) > 40000000000L) {
+					Parameters.bufferId = 0;
+					ibtlog.println("Now starting rate 0");
+					System.err.println("Now starting rate 0");
+					stepFour = false;
+				    }
+				}
+			    }
+
+			    if (Parameters.warmuped && workerID == 0) {
+				if ((now - lastPrint) > 10000000L) {
+				    lastPrint = now;
+				    delaylog.println(allTime);
+				    delaylog.flush();
+				}
 			    }
 			    
-
-			    if (allTime > MaxDelay) {
-				increasing = false;
-				if (ibt <= step)
-				    ibt = step;
-				else
-				    ibt -= step;
-			    } else {
+			    
+			    if (Parameters.useIBTAdaptation) {
+				/*
+				if (score > bestScore) {
+				    bestScore = score;
+				    bestIbt = ibt;
+				    bestDelayForScore = allTime;
+				}
+				*/
 				
-				if (score > lastScore) { //. Better
+				if (allTime > MaxDelay || !congested
+				    /*||(allTime > (bestDelayForScore<<1) && ibt > bestIbt)*/) {
+				    increasing = false;
+				    if (ibt <= step)
+					ibt = step;
+				    else
+					ibt -= step;
+				    
+				} else {
+				    if (score > lastScore) { //. Better
+					
+				    } else { //. Worse
+					increasing = !increasing;				    
+				    }
 				    if (increasing && congested) {
 					ibt += step;
+					/*
 					if (ibt > maxIbt)
 					    maxIbt = ibt;
+					*/
 				    } else {
 					if (ibt <= step)
 					    ibt = step;
 					else
 					    ibt -= step;
 				    }
-				} else { //. Worse
-				    increasing = !increasing;
 				}
 			    }
-
+			    
 			    
 			    lastScore = score;
 			    congested = false;
 			    batched = 0;
+			    begin = System.nanoTime();
 			}
 		    } else {
 			batched += of.dispatchPacket(msg.sw, msg.buf, msg.start, msg.length, false) ? 1 : 0;
+			/*
 			if (batched == 1) {
 			    begin = System.nanoTime();
 			}
+			*/
 		    }
 		} //. End of for loop
 
-		if (Parameters.totalProcessed > 40000000 && workerID == 1) {
-		    of.print();
+		/*
+		if (Parameters.totalProcessed > 40000000 && workerID == 0) {
+		    //of.print();
 		    Parameters.am.dataLogMgr.dumpLogs();
 		    Utilities.ForceExit(0);
 		}
+	        */
 	    } //. End of while loop
 	} //. End of run1()
 
@@ -1168,7 +1333,7 @@ public class openflow extends Driver {
     }
 
     public String getCounters() {
-	String ret = ""+System.nanoTime();
+	String ret = "";
 	synchronized(dpid2switch) {
 	    for (Switch sw : dpid2switch.values()) {
 		ret += String.format(" %d %d", sw.dpid, sw.totalProcessed);

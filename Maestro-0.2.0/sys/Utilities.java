@@ -33,7 +33,7 @@ public class Utilities {
     /** Whether it is small endian or big endian */
     static boolean bigEndian = true;
 
-    static PrintWriter log = null;
+    public static PrintWriter log = null;
 
     public static void openLogFile(String file) {
 	try {

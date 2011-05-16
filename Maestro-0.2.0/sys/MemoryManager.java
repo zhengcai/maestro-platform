@@ -34,6 +34,7 @@ import headers.*;
  * Need a re-design and re-implementation
  */
 public class MemoryManager {
+    /*
     public class MemoryPool<E> {
 	private ArrayList<Stack<E>> dedicated;
 	private Stack<E> shared;
@@ -66,6 +67,41 @@ public class MemoryManager {
 	    }
 	}
     }
+    */
+
+    public class MemoryPool<E> {
+	private ArrayList<ArrayList<E>> dedicated;
+	private ArrayList<E> shared;
+
+	public MemoryPool() {
+	    dedicated = new ArrayList<ArrayList<E>>();
+	    for (int i=0;i<Parameters.divide;i++) {
+		dedicated.add(new ArrayList<E>());
+	    }
+	    shared = new ArrayList<E>();
+	}
+
+	public E pop(int which) {
+	    ArrayList<E> s;
+	    if (which == -1)
+		s = shared;
+	    else
+		s = dedicated.get(which);
+	    if (s.size() > 0)
+		return s.remove(s.size()-1);
+	    else
+		return null;
+	}
+
+	public void push(E object, int which) {
+	    if (which == -1) {
+		shared.add(object);
+	    } else {
+		dedicated.get(which).add(object);
+	    }
+	}
+    }
+
 
     private MemoryPool<FlowModEvent> fms;
     private MemoryPool<PacketOutEvent> pos;

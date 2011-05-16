@@ -73,8 +73,22 @@ public class DataLogManager extends Thread {
 	    } catch (InterruptedException e) {
 
 	    }
-	    if (Parameters.warmuped)
-		Utilities.log.println(Parameters.am.vm.driver.getCounters());
+	    if (Parameters.warmuped) {
+		long now = System.nanoTime();
+		if (Parameters.whenWarmuped == 0) {
+		    Parameters.whenWarmuped = now;
+		}
+		Utilities.log.println(now+Parameters.am.vm.driver.getCounters());
+		if (Parameters.dynamicExp) {
+		    if ((now-Parameters.whenWarmuped) > 50000000000L) {
+			Utilities.ForceExit(0);
+		    }
+		} else {
+		    if ((now-Parameters.whenWarmuped) > 50000000000L) {
+			Utilities.ForceExit(0);
+		    }
+		}
+	    }
 	}
     }
 

@@ -86,8 +86,13 @@ public class Parameters {
     public static ApplicationManager am = null;
     
     public static int maxWaitingDAGIns = 20;
+
+    public static long maxDelay = 3000;
     
-    public static boolean useMemoryMgnt = true;
+    public static boolean useMemoryMgnt = false;
+    public static boolean dynamicExp = false;
+    public static boolean useIBTAdaptation = true;
+    
     public static boolean warmuped = false;
     public static boolean changePeriod = false;
     public static int numPorts = 0;
@@ -100,4 +105,7 @@ public class Parameters {
 
     public static int consoleMode = 0;
     public static String dataLogFile = "datalog.txt";
+
+    public static long bufferId = -1;
+    public static long whenWarmuped = 0;
 }

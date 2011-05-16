@@ -81,7 +81,7 @@ public class LearningSwitchesApp extends App {
 	    Short outPort = macs.getMACLocation(pi.dpid, pi.flow.dlDst);
 
 	    //Short outPort = null;
-	    /*
+	    
 	    if (null != outPort) {
 		FlowModEvent fm = null;
 		if (Parameters.useMemoryMgnt) {
@@ -115,7 +115,7 @@ public class LearningSwitchesApp extends App {
 		
 		config.addFlowModEvent(fm);
 	    }
-	    */
+	    
 	    
 	    if (null == outPort || OFPConstants.OP_UNBUFFERED_BUFFER_ID == pi.bufferId) {
 		PacketOutEvent po;
@@ -126,7 +126,10 @@ public class LearningSwitchesApp extends App {
 		}
 		po.xid = pi.xid;
 		po.dpid = pi.dpid;
-		po.bufferId = pi.bufferId;
+		if (Parameters.dynamicExp)
+		    po.bufferId = Parameters.bufferId;
+		else
+		    po.bufferId = pi.bufferId;
 		po.inPort = pi.inPort;
 		po.dataLen = pi.totalLen;
 		po.data = pi.data;
@@ -141,6 +144,12 @@ public class LearningSwitchesApp extends App {
 		po.actionsLen = po.actions[0].len;
 		pkts.addPacketOutEvent(po);
 	    }
+
+
+	    if (Parameters.useMemoryMgnt) {
+		Parameters.am.memMgr.freePacketInEvent(pi);
+	    }
+
 	}
 
 	work.clear();

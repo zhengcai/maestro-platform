@@ -71,6 +71,10 @@ public class Main {
 		    Parameters.daemonPort = Integer.parseInt(words[1]);
 		} else if (words[0].compareToIgnoreCase("mode") == 0) {
 		    Parameters.mode = Integer.parseInt(words[1]);
+		} else if (words[0].compareToIgnoreCase("maxDelay") == 0) {
+		    Parameters.maxDelay = Integer.parseInt(words[1]);
+		} else if (words[0].compareToIgnoreCase("disableIBTAdaptation") == 0) {
+		    Parameters.useIBTAdaptation = false;
 		} else {
 
 		}
