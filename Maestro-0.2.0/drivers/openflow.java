@@ -202,9 +202,9 @@ public class openflow extends Driver {
     private final static int PENDING = 500;
 	
     private HashMap<Long, Switch> dpid2switch;
-    private HashMap<SocketChannel, Switch> chnl2switch;
+    private static HashMap<SocketChannel, Switch> chnl2switch;
     private Selector s;
-    private static Selector readSelector;
+    private static ArrayList<Selector> readSelectors = new ArrayList<Selector>();
     private SwitchRRPool swRRPool;
     private ArrayList<OpenFlowTask> workers;
 
@@ -258,6 +258,13 @@ public class openflow extends Driver {
 	    msgsQueue = new LinkedList<ArrayList<RawMessage>>();
 	    //msgsQs = new MsgsQueues(Parameters.divide);
 	}
+	try {
+	    for (int i=0;i<Parameters.divide;i++) {
+		readSelectors.add(Selector.open());
+	    }
+	} catch (IOException e) {
+
+	}
     }
     
     public int SendPktOut(long dpid, ByteBuffer pkt) {
@@ -275,7 +282,6 @@ public class openflow extends Driver {
     	try {
 	    int port = Parameters.listenPort;
 	    s = Selector.open();
-	    readSelector = Selector.open();
 	    ServerSocketChannel acceptChannel = ServerSocketChannel.open();
 	    acceptChannel.configureBlocking(false);
 	    byte[] ip = {0, 0, 0, 0};
@@ -293,16 +299,19 @@ public class openflow extends Driver {
 			if (k.isAcceptable()) {
 			    SocketChannel channel = ((ServerSocketChannel)k.channel()).accept();
 			    channel.configureBlocking(false);
-			    if (Parameters.mode == 3) {
-				SelectionKey clientKey = channel.register(s, SelectionKey.OP_READ);
-			    } else {
-				SelectionKey clientKey = channel.register(readSelector, SelectionKey.OP_READ);
-			    }
 			    Switch sw = new Switch();
 			    sw.channel = channel;
 			    chnl2switch.put(channel, sw);
 			    swRRPool.addSwitch(sw);
 			    //sendHelloMessage(sw);
+
+			    if (Parameters.mode == 3) {
+				SelectionKey clientKey = channel.register(s, SelectionKey.OP_READ);
+			    } else if (Parameters.mode == 1) {
+				for (Selector rs : readSelectors) {
+				    SelectionKey clientKey = channel.register(rs, SelectionKey.OP_READ);
+				}
+			    }
 			} else if (Parameters.mode == 3 && k.isReadable()) { //. Only reachable when Parameters.mode == 3
 			    Switch sw = chnl2switch.get((SocketChannel)k.channel());
 			    Utilities.Assert(sw.channel == k.channel(), "Channels do not match!");
@@ -946,22 +955,46 @@ public class openflow extends Driver {
 		myQ = of.msgsQs.getQAt(workerID);
 	    }
 	    */
-	    
+	    Selector readSelector = readSelectors.get(workerID);
+	    Iterator<SelectionKey> key = null;
 	    while (true) {
 		Switch sw = null;
 		if (Parameters.mode == 1) {
+		    
 		    if (idx < of.getRRPool().getSize()) {
 			sw = of.getRRPool().getSwitchAt(idx++);
 		    }
 		    if (null == sw) {
-			/* //. Not good select code for flushing
-			try {
-			    if (Parameters.useIBTAdaptation &&
-				readSelector != null &&
-				readSelector.selectNow() <= 0) {
-				
-				skipped.clear();
-				idx = 0;
+			if (skipped.size() == 0 || trySkipped >= HOWMANYTRIES) {
+			    //skipped.clear();
+			    idx = 0;
+			    trySkipped = 0;
+			    continue;
+			} else {
+			    sw = skipped.removeFirst();
+			    trySkipped ++;
+			}
+		    }
+		    
+
+		    /*
+		    try {
+			if (key != null && key.hasNext()) {
+			    SelectionKey k = key.next();
+			    if (k.isReadable()) {
+				sw = chnl2switch.get((SocketChannel)k.channel());
+				if (sw == null) {
+				    System.err.println("Not found");
+				    continue;
+				}
+			    }
+			} else if (skipped.size() > 0) {
+			    sw = skipped.removeFirst();
+			} else {
+			    if (readSelector != null && readSelector.selectNow() > 0) {
+				key = readSelector.selectedKeys().iterator();
+			    }
+			    else if (Parameters.useIBTAdaptation) {
 				trySkipped = 0;
 				
 				of.flush();
@@ -976,38 +1009,20 @@ public class openflow extends Driver {
 				else
 				    ibt -= myStep;
 				
-				continue;
 			    }
-			} catch (IOException e) {
-
-			}
-			*/
-			
-			if (skipped.size() == 0 || trySkipped >= HOWMANYTRIES) {
-			    //skipped.clear();
-			    idx = 0;
-			    trySkipped = 0;
-			    /*
-			    long now = System.nanoTime();
-			    if (workerID == 0 && Parameters.warmuped) {
-				System.err.println((now-lastRound)/1000);
-			    }
-			    lastRound = now;
-			    */
 			    continue;
-			} else {
-			    sw = skipped.removeFirst();
-			    trySkipped ++;
 			}
+		    } catch (IOException e) {
+			
 		    }
+		    */
 
-		    if (skipped.size() > 50) {
-			skipped.clear();
-		    }
-		    
 		    synchronized (sw) {
 			if (sw.chopping) {
 			    skipped.addLast(sw);
+			    if (skipped.size() > 50) {
+				skipped.clear();
+			    }
 			    continue;
 			}
 			else
