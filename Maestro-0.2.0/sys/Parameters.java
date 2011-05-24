@@ -89,7 +89,7 @@ public class Parameters {
 
     public static long maxDelay = 3000;
     
-    public static boolean useMemoryMgnt = false;
+    public static boolean useMemoryMgnt = true;
     public static boolean dynamicExp = false;
     public static boolean useIBTAdaptation = true;
     

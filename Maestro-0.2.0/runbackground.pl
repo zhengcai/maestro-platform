@@ -42,6 +42,5 @@ for (my $i=0;$i<scalar @tids;$i++) {
     }
 }	
 
-
-#my $mainThread = $tids[scalar @tids - 1] - 24;
+#my $mainThread = $tids[1];
 #system("taskset -p 80 $mainThread");

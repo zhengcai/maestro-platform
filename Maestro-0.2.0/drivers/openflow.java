@@ -59,7 +59,7 @@ public class openflow extends Driver {
 	public long dpid = 0;
 	public SocketChannel channel = null;
 	public int bufferSize = 0;
-	public byte[] buffer = new byte[2048];
+	public byte[] buffer = new byte[2*BUFFERSIZE];
 
 	public boolean chopping = false;
 	public boolean sending = false;
@@ -198,7 +198,7 @@ public class openflow extends Driver {
 	}
     }
 	
-    private final static int BUFFERSIZE = 1024;
+    private final static int BUFFERSIZE = 2048;
     private final static int PENDING = 500;
 	
     private HashMap<Long, Switch> dpid2switch;
@@ -209,6 +209,44 @@ public class openflow extends Driver {
     private ArrayList<OpenFlowTask> workers;
 
     public LinkedList<ArrayList<RawMessage>> msgsQueue;
+
+    private static class MsgsQueues {
+	private ArrayList<LinkedList<ArrayList<RawMessage>>> qs;
+
+	public MsgsQueues(int n) {
+	    qs = new ArrayList<LinkedList<ArrayList<RawMessage>>>();
+	    for (int i=0;i<n;i++) {
+		qs.add(new LinkedList<ArrayList<RawMessage>>());
+	    }
+	}
+
+	public LinkedList<ArrayList<RawMessage>> getQAt(int which) {
+	    return qs.get(which);
+	}
+
+	public LinkedList<ArrayList<RawMessage>> getShortest() {
+	    LinkedList<ArrayList<RawMessage>> ret = null;
+	    int shortest = Integer.MAX_VALUE;
+	    for (LinkedList<ArrayList<RawMessage>> q : qs) {
+		int size = q.size();
+		if (size < shortest) {
+		    shortest = size;
+		    ret = q;
+		}
+	    }
+	    return ret;
+	}
+
+	public int getTotal() {
+	    int total = 0;
+	    for (LinkedList<ArrayList<RawMessage>> q : qs) {
+		total += q.size();
+	    }
+	    return total;
+	}
+    }
+
+    public MsgsQueues msgsQs;
 	
     public openflow() {
     	random = new Random();
@@ -218,6 +256,7 @@ public class openflow extends Driver {
 	workers = new ArrayList<OpenFlowTask>();
 	if(Parameters.mode == 3) {
 	    msgsQueue = new LinkedList<ArrayList<RawMessage>>();
+	    //msgsQs = new MsgsQueues(Parameters.divide);
 	}
     }
     
@@ -246,6 +285,7 @@ public class openflow extends Driver {
 	    acceptChannel.socket().setReuseAddress(true);
 			
 	    SelectionKey acceptKey = acceptChannel.register(s, SelectionKey.OP_ACCEPT);
+	    int which = 0;
 	    while (s.select() > 0) {
 		Set<SelectionKey> readyKeys = s.selectedKeys();
 		for (SelectionKey k : readyKeys) {
@@ -264,7 +304,6 @@ public class openflow extends Driver {
 			    swRRPool.addSwitch(sw);
 			    //sendHelloMessage(sw);
 			} else if (Parameters.mode == 3 && k.isReadable()) { //. Only reachable when Parameters.mode == 3
-			    //long before = System.nanoTime();
 			    Switch sw = chnl2switch.get((SocketChannel)k.channel());
 			    Utilities.Assert(sw.channel == k.channel(), "Channels do not match!");
 			    ByteBuffer buffer = ByteBuffer.allocate(BUFFERSIZE);
@@ -276,28 +315,32 @@ public class openflow extends Driver {
 				System.err.println("DAMN, 0");
 				continue;
 			    }
-			    //long after = System.nanoTime();
-			    //Parameters.t1 += after - before;
-			    //before = after;
 
-			    ArrayList<RawMessage> msgs = chopMessages(sw, buffer, size);
+			    ArrayList<RawMessage> msgs = chopMessages(sw, buffer, size);			    
 			    if (msgs != null && msgs.size()>0) {
+				
 				synchronized (msgsQueue) {
 				    msgsQueue.add(msgs);
 				    msgsQueue.notify();
 				}
+				
+
+				/*
+				LinkedList<ArrayList<RawMessage>> q = msgsQs.getQAt(which);
+				which = (which+1) % Parameters.divide;
+				synchronized (q) {
+				    q.add(msgs);
+				    q.notify();
+				}
+				*/
+				
 				sw.totalProcessed += msgs.size();
 				Parameters.totalProcessed += msgs.size();
 			    }
-			    //after = System.nanoTime();
-			    //Parameters.t2 += after - before;
-			    //before = after;
 
 			    while (msgsQueue.size() > PENDING) {
+			    //while (msgsQs.getTotal() > PENDING) {
 				Thread.sleep(1);
-				//System.err.println("t1 "+Parameters.t1);
-				//System.err.println("t2 "+Parameters.t2);
-				//System.err.println("t3 "+Parameters.t3);
 			    }
 			}
 		    } catch (IOException e) {
@@ -863,7 +906,7 @@ public class openflow extends Driver {
 	    double bestScore = 0;
 	    int bestIbt = 0;
 	    long bestDelayForScore = 0;
-	    final int step = 20;
+	    final int step = 10;
 	    boolean congested = false;
 	    boolean increasing = true;
 	    int batched = 0;
@@ -877,7 +920,6 @@ public class openflow extends Driver {
 	    long lastRound = System.nanoTime();
 	    long lastAssign = lastRound;
 	    LinkedList<Switch> skipped = new LinkedList<Switch>();
-
 	    
 	    PrintWriter ibtlog = null;
 	    try {
@@ -897,6 +939,13 @@ public class openflow extends Driver {
 	    boolean stepTwo = true;
 	    boolean stepThree = true;
 	    boolean stepFour = true;
+
+	    /*
+	    LinkedList<ArrayList<RawMessage>> myQ = null;
+	    if (Parameters.mode == 3) {
+		myQ = of.msgsQs.getQAt(workerID);
+	    }
+	    */
 	    
 	    while (true) {
 		Switch sw = null;
@@ -1037,7 +1086,8 @@ public class openflow extends Driver {
 				    increasing = false;
 				    congested = false;
 				    
-				    int myStep = step << 1 + step >> 1;
+				    //int myStep = step << 1 + step >> 1;
+				    int myStep = step;
 				    if (ibt <= myStep)
 					ibt = step;
 				    else
@@ -1063,8 +1113,15 @@ public class openflow extends Driver {
 			handleLeftSwitch(sw);
 		    }
 		} else if(Parameters.mode == 3) {
+		    
 		    synchronized (of.msgsQueue) {
 			while (of.msgsQueue.isEmpty()) {
+		    
+
+		    /*
+		    synchronized (myQ) {
+			while (myQ.isEmpty()) {
+		    */
 			    if (Parameters.useIBTAdaptation && batched > 0) {
 				of.flush();
 				batched = 0;
@@ -1079,11 +1136,13 @@ public class openflow extends Driver {
 			    }
 			    try {
 				of.msgsQueue.wait();
+				//myQ.wait();
 			    } catch (InterruptedException ignored) {
 				
 			    }
 			}
 			msgs = of.msgsQueue.removeFirst();
+			//msgs = myQ.removeFirst();
 		    }
 		}
 

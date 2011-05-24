@@ -81,7 +81,7 @@ public class LearningSwitchesApp extends App {
 	    Short outPort = macs.getMACLocation(pi.dpid, pi.flow.dlDst);
 
 	    //Short outPort = null;
-	    
+	    /*
 	    if (null != outPort) {
 		FlowModEvent fm = null;
 		if (Parameters.useMemoryMgnt) {
@@ -115,7 +115,7 @@ public class LearningSwitchesApp extends App {
 		
 		config.addFlowModEvent(fm);
 	    }
-	    
+	    */
 	    
 	    if (null == outPort || OFPConstants.OP_UNBUFFERED_BUFFER_ID == pi.bufferId) {
 		PacketOutEvent po;
