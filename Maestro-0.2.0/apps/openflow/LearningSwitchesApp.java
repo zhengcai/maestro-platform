@@ -61,6 +61,7 @@ public class LearningSwitchesApp extends App {
 	for (PacketInEvent pi : work) {
 	    if (pi.reason == 1) {
 		if (!Parameters.warmuped) {
+		    System.err.println("Warmup");
 		    Parameters.warmuped = true;
 		}
 	    }

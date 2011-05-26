@@ -59,7 +59,7 @@ public class openflow extends Driver {
 	public long dpid = 0;
 	public SocketChannel channel = null;
 	public int bufferSize = 0;
-	public byte[] buffer = new byte[2*BUFFERSIZE];
+	public byte[] buffer = new byte[4*BUFFERSIZE];
 
 	public boolean chopping = false;
 	public boolean sending = false;
@@ -71,6 +71,11 @@ public class openflow extends Driver {
 	public long totalProcessed = 0;
 	public long poPushed = 0;
 	public long lastProcessed = 0;
+
+	public long c0 = 0; //.0
+	public long c1 = 0; //.1-10
+	public long c10 = 0; //.10-100
+	public long c100 = 0; //.100-1024
 		
 	/** For those lldps received before the dpid of this switch is known */
 	private LinkedList<LLDPPacketInEvent> lldpQueue;
@@ -109,8 +114,9 @@ public class openflow extends Driver {
 			count++;
 			if (count > 300000) {
 			    System.err.println("Too many tries for "+dpid);
-			    sending = false;
-			    return ret;
+			    count = 0;
+			    //sending = false;
+			    //return ret;
 			}
 			
 		    }
@@ -886,11 +892,24 @@ public class openflow extends Driver {
     }
 	
     public void print() {
-	for (long i=1;i<=60;i++) {
+	PrintWriter log = null;
+	try {
+	    log = new PrintWriter(new File("histogram.txt"));
+	} catch (FileNotFoundException e) {
+	    System.err.println("Not found!!!!!!!!");
+	} 
+	for (long i=1;i<=dpid2switch.values().size();i++) {
 	    Switch sw = dpid2switch.get(i);
+	    if (sw == null) {
+		break;
+	    }
+	    log.println(String.format("#%d %d %d %d %d", i, sw.c0, sw.c1, sw.c10, sw.c100));
+	    /*
 	    if (sw.totalSize > 100000)
 		System.err.println("Switch # "+i+" chances "+sw.chances+" processed "+sw.totalProcessed+" POpushed "+sw.poPushed+" totalSize "+sw.totalSize+" zeroes "+sw.zeroes);
+	    */
 	}
+	log.close();
     }
 
     public static class OpenFlowTask implements Runnable {
@@ -949,6 +968,7 @@ public class openflow extends Driver {
 	    boolean stepThree = true;
 	    boolean stepFour = true;
 
+	    boolean rePartition = true;
 	    /*
 	    LinkedList<ArrayList<RawMessage>> myQ = null;
 	    if (Parameters.mode == 3) {
@@ -975,7 +995,13 @@ public class openflow extends Driver {
 			    trySkipped ++;
 			}
 		    }
-		    
+		    /*
+		    if (sw.zeroes > 1000) {
+			if (of.random.nextInt(100) >= 10) {
+			    continue;
+			}
+		    }
+		    */
 
 		    /*
 		    try {
@@ -1055,9 +1081,9 @@ public class openflow extends Driver {
 		    }
 		    */
 
-		    if (workerID == 0) {
+		    if (/*!Parameters.warmuped &&*/ workerID == 0) {
 			long now = System.nanoTime();
-			if ((now-lastAssign) > 2000000000) {
+			if ((now-lastAssign) > 2000000000L) {
 			    lastAssign = now;
 			    of.reassignSwitches();
 			}
@@ -1066,7 +1092,13 @@ public class openflow extends Driver {
 		    if (null == sw) {
 			continue;
 		    }
-
+		    /*
+		    if (sw.zeroes > 1000) {
+			if (of.random.nextInt(100) >= 50) {
+			    continue;
+			}
+		    }
+		    */
 		    synchronized (sw) {
 			if (!sw.chopping)
 			    sw.chopping = true;
@@ -1076,18 +1108,28 @@ public class openflow extends Driver {
 		ArrayList<RawMessage> msgs = null;
 
 		if(Parameters.mode == 1 || Parameters.mode == 2) {
-		    if (Parameters.warmuped)
-			sw.chances ++;
 		    try {
 			buffer.clear();
 			int size = sw.channel.read(buffer);
+
+			if (Parameters.warmuped) {
+			    sw.chances ++;
+			    if (size == 0)
+				sw.c0++;
+			    else if (size <= 10)
+				sw.c1++;
+			    else if (size <= 100)
+				sw.c10++;
+			    else
+				sw.c100++;
+			}
+			
 			if (size == -1) {
 			    sw.chopping = false;
 			    handleLeftSwitch(sw);
 			    continue;
 			} else if (size == 0) {
-			    if (Parameters.warmuped)
-				sw.zeroes ++;
+			    sw.zeroes ++;
 			    sw.chopping = false;
 
 			    
@@ -1114,6 +1156,7 @@ public class openflow extends Driver {
 			} else if (size == BUFFERSIZE) {
 			    congested = true;
 			}
+			sw.zeroes = 0;
 			
 			msgs = of.chopMessages(sw, buffer, size);
 			sw.chopping = false;
@@ -1179,8 +1222,7 @@ public class openflow extends Driver {
 				score = (score*(100-HistoryWeight) + history[hisIdx]*HistoryWeight) / 100;
 				history[hisIdx] = score;
 			    }
-			    
-			    
+
 			    if (Parameters.dynamicExp && Parameters.warmuped && workerID == 0) {
 				if ((now - lastPrint) > 10000000L) {
 				    //System.err.println(ibt+" "+increasing+" "+score+" ("+realScore+") "+lastScore+" "+allTime+" || best "+bestScore+" at "+bestDelayForScore);
@@ -1219,6 +1261,7 @@ public class openflow extends Driver {
 				}
 			    }
 
+			    /*
 			    if (Parameters.warmuped && workerID == 0) {
 				if ((now - lastPrint) > 10000000L) {
 				    lastPrint = now;
@@ -1226,7 +1269,7 @@ public class openflow extends Driver {
 				    delaylog.flush();
 				}
 			    }
-			    
+			    */
 			    
 			    if (Parameters.useIBTAdaptation) {
 				/*
