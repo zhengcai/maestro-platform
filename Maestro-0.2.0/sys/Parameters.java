@@ -88,6 +88,8 @@ public class Parameters {
     public static int maxWaitingDAGIns = 20;
 
     public static long maxDelay = 3000;
+
+    public static int bufferSize = 1024;
     
     public static boolean useMemoryMgnt = true;
     public static boolean dynamicExp = false;

@@ -81,12 +81,12 @@ public class DataLogManager extends Thread {
 		Utilities.log.println(now+Parameters.am.vm.driver.getCounters());
 		if (Parameters.dynamicExp) {
 		    if ((now-Parameters.whenWarmuped) > 50000000000L) {
-			Parameters.am.vm.driver.print();
+			//Parameters.am.vm.driver.print();
 			Utilities.ForceExit(0);
 		    }
 		} else {
 		    if ((now-Parameters.whenWarmuped) > 50000000000L) {
-			Parameters.am.vm.driver.print();
+			//Parameters.am.vm.driver.print();
 			Utilities.ForceExit(0);
 		    }
 		}

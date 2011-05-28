@@ -30,6 +30,7 @@ import events.Event;
 import events.openflow.PacketOutEvent;
 import views.View;
 import sys.Parameters;
+import sys.Utilities;
 
 /**
  * Contains a number of PacketOutEvent
@@ -38,6 +39,7 @@ import sys.Parameters;
 public class PacketsOutView extends View {
     public HashMap<Long, ArrayList<Event>> pkts;
     private ArrayList<ArrayList<Event>> remaining;
+    private boolean[] who = new boolean[512];
 	
     public PacketsOutView() {
 	pkts = new HashMap<Long, ArrayList<Event>>();
@@ -61,10 +63,35 @@ public class PacketsOutView extends View {
 		    remaining.add(events);
 	}
 	//pkts.clear();
-	
+
+	if (remaining.size() > 512) {
+	    System.err.println("BAD!! LARGER THAN 512");
+	    Utilities.ForceExit(0);
+	}
+	for (int i=0;i<remaining.size();i++) {
+	    who[i] = true;
+	}
+	int rem = remaining.size();
+	int size = rem;
+
+	int i = 0;
+	while (rem > 0) {
+	    if (who[i]) {
+		ArrayList<Event> events = remaining.get(i);
+		if (driver.commitEvent(events)) {
+		    who[i] = false;
+		    rem --;
+		}
+	    }
+	    i = (++i)%size;
+	}
+
+	/*
 	for (ArrayList<Event> events : remaining) {
 	    while (!driver.commitEvent(events));
 	}
+	*/
+	
 	remaining.clear();
     }
 

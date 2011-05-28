@@ -75,6 +75,8 @@ public class Main {
 		    Parameters.maxDelay = Integer.parseInt(words[1]);
 		} else if (words[0].compareToIgnoreCase("disableIBTAdaptation") == 0) {
 		    Parameters.useIBTAdaptation = false;
+		} else if (words[0].compareToIgnoreCase("bufferSize") == 0) {
+		    Parameters.bufferSize = Integer.parseInt(words[1]);
 		} else {
 
 		}

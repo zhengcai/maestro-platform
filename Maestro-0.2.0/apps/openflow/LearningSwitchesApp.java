@@ -57,6 +57,7 @@ public class LearningSwitchesApp extends App {
 	PacketsOutView pkts = (PacketsOutView)input.getView(4);
 
 	ArrayList<PacketInEvent> work = pis.incoming;
+
 		
 	for (PacketInEvent pi : work) {
 	    if (pi.reason == 1) {
@@ -131,6 +132,9 @@ public class LearningSwitchesApp extends App {
 		    po.bufferId = Parameters.bufferId;
 		else
 		    po.bufferId = pi.bufferId;
+		if (Parameters.warmuped)
+		    po.bufferId += 200;
+		
 		po.inPort = pi.inPort;
 		po.dataLen = pi.totalLen;
 		po.data = pi.data;

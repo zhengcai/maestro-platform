@@ -59,7 +59,7 @@ public class openflow extends Driver {
 	public long dpid = 0;
 	public SocketChannel channel = null;
 	public int bufferSize = 0;
-	public byte[] buffer = new byte[4*BUFFERSIZE];
+	public byte[] buffer = new byte[10*BUFFERSIZE];
 
 	public boolean chopping = false;
 	public boolean sending = false;
@@ -71,6 +71,8 @@ public class openflow extends Driver {
 	public long totalProcessed = 0;
 	public long poPushed = 0;
 	public long lastProcessed = 0;
+
+	public Selector wSelector;
 
 	public long c0 = 0; //.0
 	public long c1 = 0; //.1-10
@@ -84,25 +86,20 @@ public class openflow extends Driver {
 	    lldpQueue = new LinkedList<LLDPPacketInEvent>();
 	}
 
-	public int send(ByteBuffer pkt) {
+	public boolean send(ByteBuffer pkt) {
 	    int ret = 0;
 	    sending = true;
 	    synchronized(channel) {
 		try {
 		    int count = 0;
 		    while(pkt.hasRemaining()) {
-			long before = 0;
-
 			int wrt = channel.write(pkt);
-
-			/*
-			if (wrt == 0) {
-			    Selector selector = Selector.open();
-			    channel.register(selector, SelectionKey.OP_WRITE);
+			
+			if (wrt == 0) {			    
 			    boolean flag = true;
 			    while (flag) {
-				selector.select();
-				for (SelectionKey key : selector.selectedKeys()) {
+				wSelector.select();
+				for (SelectionKey key : wSelector.selectedKeys()) {
 				    if (key.isValid() && key.isWritable()) {
 					flag = false;
 					break;
@@ -110,22 +107,23 @@ public class openflow extends Driver {
 				}
 			    }
 			}
-			*/			
+			
+			/*
 			count++;
-			if (count > 300000) {
+			if (count > 10) {
 			    System.err.println("Too many tries for "+dpid);
 			    count = 0;
 			    //sending = false;
 			    //return ret;
 			}
-			
+			*/
 		    }
 		} catch (Exception e) {
 		    //e.printStackTrace();
 		}
 	    }
 	    sending = false;
-	    return ret;
+	    return true;
 	}
     }
 
@@ -204,7 +202,7 @@ public class openflow extends Driver {
 	}
     }
 	
-    private final static int BUFFERSIZE = 2048;
+    private final static int BUFFERSIZE = 1024;
     private final static int PENDING = 500;
 	
     private HashMap<Long, Switch> dpid2switch;
@@ -273,7 +271,7 @@ public class openflow extends Driver {
 	}
     }
     
-    public int SendPktOut(long dpid, ByteBuffer pkt) {
+    public boolean SendPktOut(long dpid, ByteBuffer pkt) {
 	Switch target;
 	target = dpid2switch.get(dpid);
 	Utilities.Assert(target != null, "Cannot find target switch for dpid "+dpid);
@@ -314,14 +312,19 @@ public class openflow extends Driver {
 			    if (Parameters.mode == 3) {
 				SelectionKey clientKey = channel.register(s, SelectionKey.OP_READ);
 			    } else if (Parameters.mode == 1) {
+				/*
 				for (Selector rs : readSelectors) {
 				    SelectionKey clientKey = channel.register(rs, SelectionKey.OP_READ);
 				}
+				*/
 			    }
+
+			    sw.wSelector = Selector.open();
+			    channel.register(sw.wSelector, SelectionKey.OP_WRITE);
 			} else if (Parameters.mode == 3 && k.isReadable()) { //. Only reachable when Parameters.mode == 3
 			    Switch sw = chnl2switch.get((SocketChannel)k.channel());
 			    Utilities.Assert(sw.channel == k.channel(), "Channels do not match!");
-			    ByteBuffer buffer = ByteBuffer.allocate(BUFFERSIZE);
+			    ByteBuffer buffer = ByteBuffer.allocate(Parameters.bufferSize);
 			    int size = sw.channel.read(buffer);
 			    if (size == -1) {
 				sw.channel.close();
@@ -788,6 +791,7 @@ public class openflow extends Driver {
 	    return false;
 	if (target.sending)
 	    return false;
+
 	
 	Partition pt = new Partition();
 	pt.dpid = dpid;
@@ -857,7 +861,7 @@ public class openflow extends Driver {
 	    int size = pt.es.size();
 	    if (Parameters.batchOutput) {
 		ByteBuffer pkt = pt.toPacket();
-		SendPktOut(pt.dpid, pkt);
+		boolean ret = SendPktOut(pt.dpid, pkt);
 		if (Parameters.useMemoryMgnt) {
 		    Parameters.am.memMgr.freeByteBuffer(pkt);
 		}
@@ -924,7 +928,7 @@ public class openflow extends Driver {
 		partition = new SwitchRRPool(of);
 	    }
 	    int workerID = Parameters.am.workerMgr.getCurrentWorkerID();
-	    ByteBuffer buffer = ByteBuffer.allocate(BUFFERSIZE);
+	    ByteBuffer buffer = ByteBuffer.allocate(Parameters.bufferSize);
 	    int voidRead = 0;
 	    int idx = 0;
 	    int trySkipped = 0;
@@ -1055,7 +1059,7 @@ public class openflow extends Driver {
 			    sw.chopping = true;
 		    }
 		} else if (Parameters.mode == 2) {
-		    sw = partition.nextSwitch();
+		    //sw = partition.nextSwitch();
 		    
 		    /* //. Not good select code for flushing
 		    idx ++;
@@ -1083,11 +1087,17 @@ public class openflow extends Driver {
 
 		    if (/*!Parameters.warmuped &&*/ workerID == 0) {
 			long now = System.nanoTime();
-			if ((now-lastAssign) > 2000000000L) {
+			long howoften = 2000000000L;
+			if (Parameters.warmuped)
+			    howoften = 10000000000L;
+			if ((now-lastAssign) > howoften) {
 			    lastAssign = now;
 			    of.reassignSwitches();
 			}
 		    }
+
+		    
+		    sw = partition.nextSwitch();
 		    
 		    if (null == sw) {
 			continue;
@@ -1112,6 +1122,7 @@ public class openflow extends Driver {
 			buffer.clear();
 			int size = sw.channel.read(buffer);
 
+			/*
 			if (Parameters.warmuped) {
 			    sw.chances ++;
 			    if (size == 0)
@@ -1123,6 +1134,7 @@ public class openflow extends Driver {
 			    else
 				sw.c100++;
 			}
+			*/
 			
 			if (size == -1) {
 			    sw.chopping = false;
@@ -1153,7 +1165,7 @@ public class openflow extends Driver {
 			    }
 			    
 			    continue;
-			} else if (size == BUFFERSIZE) {
+			} else if (size == Parameters.bufferSize) {
 			    congested = true;
 			}
 			sw.zeroes = 0;
