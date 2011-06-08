@@ -89,7 +89,7 @@ public class Parameters {
 
     public static long maxDelay = 3000;
 
-    public static int bufferSize = 1024;
+    public static int bufferSize = 2100;
     
     public static boolean useMemoryMgnt = true;
     public static boolean dynamicExp = false;

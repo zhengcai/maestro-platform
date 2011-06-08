@@ -59,7 +59,8 @@ public class openflow extends Driver {
 	public long dpid = 0;
 	public SocketChannel channel = null;
 	public int bufferSize = 0;
-	public byte[] buffer = new byte[10*BUFFERSIZE];
+	//public byte[] buffer = new byte[10*BUFFERSIZE];
+	public byte[] buffer = new byte[128000];
 
 	public boolean chopping = false;
 	public boolean sending = false;
@@ -296,6 +297,8 @@ public class openflow extends Driver {
 			
 	    SelectionKey acceptKey = acceptChannel.register(s, SelectionKey.OP_ACCEPT);
 	    int which = 0;
+
+	    int who = 0;
 	    while (s.select() > 0) {
 		Set<SelectionKey> readyKeys = s.selectedKeys();
 		for (SelectionKey k : readyKeys) {
@@ -317,6 +320,9 @@ public class openflow extends Driver {
 				    SelectionKey clientKey = channel.register(rs, SelectionKey.OP_READ);
 				}
 				*/
+			    } else if (Parameters.mode == 4) {
+				workers.get(who).partition.addSwitch(sw);
+				who = (who+1)%Parameters.divide;
 			    }
 
 			    sw.wSelector = Selector.open();
@@ -924,8 +930,11 @@ public class openflow extends Driver {
 	}
 
 	public void run() {
-	    if (Parameters.mode == 2) {
+	    if (Parameters.mode == 2 || Parameters.mode == 4) {
 		partition = new SwitchRRPool(of);
+		if (Parameters.mode == 4) {
+		    Parameters.bufferSize = 63000;
+		}
 	    }
 	    int workerID = Parameters.am.workerMgr.getCurrentWorkerID();
 	    ByteBuffer buffer = ByteBuffer.allocate(Parameters.bufferSize);
@@ -1059,8 +1068,6 @@ public class openflow extends Driver {
 			    sw.chopping = true;
 		    }
 		} else if (Parameters.mode == 2) {
-		    //sw = partition.nextSwitch();
-		    
 		    /* //. Not good select code for flushing
 		    idx ++;
 		    if (Parameters.useIBTAdaptation && idx > partition.getSize()) {
@@ -1109,15 +1116,23 @@ public class openflow extends Driver {
 			}
 		    }
 		    */
-		    synchronized (sw) {
+		    //synchronized (sw) {
 			if (!sw.chopping)
 			    sw.chopping = true;
-		    }		    
+			//}		    
+		} else if (Parameters.mode == 4) {
+		    sw = partition.nextSwitch();
+		    
+		    if (null == sw) {
+			continue;
+		    }
+		    if (!sw.chopping)
+			sw.chopping = true;
 		}
 		
 		ArrayList<RawMessage> msgs = null;
 
-		if(Parameters.mode == 1 || Parameters.mode == 2) {
+		if(Parameters.mode == 1 || Parameters.mode == 2 || Parameters.mode == 4) {
 		    try {
 			buffer.clear();
 			int size = sw.channel.read(buffer);
@@ -1244,23 +1259,23 @@ public class openflow extends Driver {
 				
 				if (Parameters.whenWarmuped != 0) {
 				    if (stepOne && (now - Parameters.whenWarmuped) > 10000000000L) {
-					Parameters.bufferId = 3;
-					ibtlog.println("Now starting rate 3");
-					System.err.println("Now starting rate 3");
+					Parameters.bufferId = 4;
+					ibtlog.println("Now starting rate 4");
+					System.err.println("Now starting rate 4");
 					stepOne = false;
 				    }
 
 				    if (stepTwo && (now - Parameters.whenWarmuped) > 20000000000L) {
-					Parameters.bufferId = 6;
-					ibtlog.println("Now starting rate 6");
-					System.err.println("Now starting rate 6");
+					Parameters.bufferId = 8;
+					ibtlog.println("Now starting rate 8");
+					System.err.println("Now starting rate 8");
 					stepTwo = false;
 				    }
 
 				    if (stepThree && (now - Parameters.whenWarmuped) > 30000000000L) {
-					Parameters.bufferId = 3;
-					ibtlog.println("Now starting rate 3");
-					System.err.println("Now starting rate 3");
+					Parameters.bufferId = 4;
+					ibtlog.println("Now starting rate 4");
+					System.err.println("Now starting rate 4");
 					stepThree = false;
 				    }
 
@@ -1319,6 +1334,10 @@ public class openflow extends Driver {
 					    ibt -= step;
 				    }
 				}
+			    }
+
+			    if (Parameters.mode == 4) {
+				ibt = 750;
 			    }
 			    
 			    
