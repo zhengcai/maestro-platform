@@ -64,6 +64,8 @@ public class openflow extends Driver {
 
 	public boolean chopping = false;
 	public boolean sending = false;
+	public boolean active = true;
+	public boolean marked = false;
 	public int chances = 0;
 	public int skipped = 0;
 	public int totalSize = 0;
@@ -95,29 +97,30 @@ public class openflow extends Driver {
 		    int count = 0;
 		    while(pkt.hasRemaining()) {
 			int wrt = channel.write(pkt);
-			
-			if (wrt == 0) {			    
-			    boolean flag = true;
-			    while (flag) {
-				wSelector.select();
-				for (SelectionKey key : wSelector.selectedKeys()) {
-				    if (key.isValid() && key.isWritable()) {
-					flag = false;
-					break;
+			//if (Parameters.mode != 1) {
+			if (true) {
+			    if (wrt == 0) {			    
+				boolean flag = true;
+				while (flag) {
+				    wSelector.select();
+				    for (SelectionKey key : wSelector.selectedKeys()) {
+					if (key.isValid() && key.isWritable()) {
+					    flag = false;
+					    break;
+					}
 				    }
 				}
 			    }
 			}
-			
-			/*
-			count++;
-			if (count > 10) {
-			    System.err.println("Too many tries for "+dpid);
-			    count = 0;
-			    //sending = false;
-			    //return ret;
+			else {
+			    count++;
+			    if (count > 30000) {
+				System.err.println("Too many tries for "+dpid);
+				count = 0;
+				//sending = false;
+				//return ret;
+			    }
 			}
-			*/
 		    }
 		} catch (Exception e) {
 		    //e.printStackTrace();
@@ -209,6 +212,12 @@ public class openflow extends Driver {
     private HashMap<Long, Switch> dpid2switch;
     private static HashMap<SocketChannel, Switch> chnl2switch;
     private Selector s;
+    
+    public Selector sel;
+    //public boolean selecting = false;
+    public int whoSel = 0;
+    public ArrayList<Switch> sws = new ArrayList<Switch>();
+
     private static ArrayList<Selector> readSelectors = new ArrayList<Selector>();
     private SwitchRRPool swRRPool;
     private ArrayList<OpenFlowTask> workers;
@@ -287,6 +296,7 @@ public class openflow extends Driver {
     	try {
 	    int port = Parameters.listenPort;
 	    s = Selector.open();
+	    sel = Selector.open();
 	    ServerSocketChannel acceptChannel = ServerSocketChannel.open();
 	    acceptChannel.configureBlocking(false);
 	    byte[] ip = {0, 0, 0, 0};
@@ -299,7 +309,30 @@ public class openflow extends Driver {
 	    int which = 0;
 
 	    int who = 0;
+
+	    long thetime = 0;
+	    long before = 0;
+	    long num = 0;
+
 	    while (s.select() > 0) {
+		/*
+		long now = System.nanoTime();
+		if (Parameters.warmuped) {
+		    thetime += now - before;
+		    num ++;
+
+		    if (num % 1000 == 0) {
+			System.err.println(thetime / (num*1000));
+		    }
+		}
+		before = now;
+		*/
+
+		
+		//if (Parameters.warmuped) {
+		//Thread.sleep(1);
+		//}
+		
 		Set<SelectionKey> readyKeys = s.selectedKeys();
 		for (SelectionKey k : readyKeys) {
 		    try {
@@ -310,11 +343,16 @@ public class openflow extends Driver {
 			    sw.channel = channel;
 			    chnl2switch.put(channel, sw);
 			    swRRPool.addSwitch(sw);
+			    synchronized (sws) {
+				sws.add(sw);
+			    }
 			    //sendHelloMessage(sw);
 
 			    if (Parameters.mode == 3) {
 				SelectionKey clientKey = channel.register(s, SelectionKey.OP_READ);
 			    } else if (Parameters.mode == 1) {
+				//SelectionKey clientKey = channel.register(s, SelectionKey.OP_READ);
+				SelectionKey clientKey = channel.register(sel, SelectionKey.OP_READ);
 				/*
 				for (Selector rs : readSelectors) {
 				    SelectionKey clientKey = channel.register(rs, SelectionKey.OP_READ);
@@ -323,48 +361,52 @@ public class openflow extends Driver {
 			    } else if (Parameters.mode == 4) {
 				workers.get(who).partition.addSwitch(sw);
 				who = (who+1)%Parameters.divide;
+
+				//workers.get(channel.hashCode()%Parameters.divide).partition.addSwitch(sw);
 			    }
 
 			    sw.wSelector = Selector.open();
 			    channel.register(sw.wSelector, SelectionKey.OP_WRITE);
-			} else if (Parameters.mode == 3 && k.isReadable()) { //. Only reachable when Parameters.mode == 3
-			    Switch sw = chnl2switch.get((SocketChannel)k.channel());
-			    Utilities.Assert(sw.channel == k.channel(), "Channels do not match!");
-			    ByteBuffer buffer = ByteBuffer.allocate(Parameters.bufferSize);
-			    int size = sw.channel.read(buffer);
-			    if (size == -1) {
-				sw.channel.close();
-				continue;
-			    } else if (size == 0) {
-				System.err.println("DAMN, 0");
-				continue;
-			    }
-
-			    ArrayList<RawMessage> msgs = chopMessages(sw, buffer, size);			    
-			    if (msgs != null && msgs.size()>0) {
-				
-				synchronized (msgsQueue) {
-				    msgsQueue.add(msgs);
-				    msgsQueue.notify();
+			} else if (k.isReadable()) { //. Only reachable when Parameters.mode == 3
+			    if (Parameters.mode == 3) {
+				Switch sw = chnl2switch.get((SocketChannel)k.channel());
+				Utilities.Assert(sw.channel == k.channel(), "Channels do not match!");
+				ByteBuffer buffer = ByteBuffer.allocate(Parameters.bufferSize);
+				int size = sw.channel.read(buffer);
+				if (size == -1) {
+				    sw.channel.close();
+				    continue;
+				} else if (size == 0) {
+				    System.err.println("DAMN, 0");
+				    continue;
 				}
 				
-
-				/*
-				LinkedList<ArrayList<RawMessage>> q = msgsQs.getQAt(which);
-				which = (which+1) % Parameters.divide;
-				synchronized (q) {
-				    q.add(msgs);
-				    q.notify();
+				ArrayList<RawMessage> msgs = chopMessages(sw, buffer, size);			    
+				if (msgs != null && msgs.size()>0) {
+				    
+				    synchronized (msgsQueue) {
+					msgsQueue.add(msgs);
+					msgsQueue.notify();
+				    }
+				    
+				    
+				    /*
+				      LinkedList<ArrayList<RawMessage>> q = msgsQs.getQAt(which);
+				      which = (which+1) % Parameters.divide;
+				      synchronized (q) {
+				      q.add(msgs);
+				      q.notify();
+				      }
+				    */
+				    
+				    sw.totalProcessed += msgs.size();
+				    Parameters.totalProcessed += msgs.size();
 				}
-				*/
 				
-				sw.totalProcessed += msgs.size();
-				Parameters.totalProcessed += msgs.size();
-			    }
-
-			    while (msgsQueue.size() > PENDING) {
-			    //while (msgsQs.getTotal() > PENDING) {
-				Thread.sleep(1);
+				while (msgsQueue.size() > PENDING) {
+				    //while (msgsQs.getTotal() > PENDING) {
+				    Thread.sleep(1);
+				}
 			    }
 			}
 		    } catch (IOException e) {
@@ -929,6 +971,55 @@ public class openflow extends Driver {
 	    of = o;
 	}
 
+	public void select() {
+	    if (of.sel == null) {
+		return;
+	    }
+
+	    try {
+		if (Parameters.mode == 1) {
+		    for (Switch sw : of.sws) {
+			sw.marked = false;
+		    }
+		}
+	    } catch (ConcurrentModificationException e) {
+		return;
+	    } catch (NoSuchElementException e) {
+		return;
+	    } catch (NullPointerException e) {
+		return;
+	    }
+		
+
+	    try {
+		if (of.sel.selectNow() > 0) {
+		    Set<SelectionKey> readyKeys = of.sel.selectedKeys();
+		    for (SelectionKey k : readyKeys) {
+			if (k.isReadable()) {
+			    Switch sw = of.chnl2switch.get((SocketChannel)k.channel());
+			    sw.marked = true;
+			}
+		    }
+		    readyKeys.clear();
+		    
+		    if (Parameters.mode == 1) {
+			for (Switch sw : of.sws) {
+			    sw.active = sw.marked;
+			}
+		    }
+		}
+	    } catch (IOException e ) {
+		e.printStackTrace();
+		System.exit(0);
+	    } catch (ConcurrentModificationException e) {
+		return;
+	    } catch (NoSuchElementException e) {
+		return;
+	    } catch (NullPointerException e) {
+		return;
+	    }
+	}
+
 	public void run() {
 	    if (Parameters.mode == 2 || Parameters.mode == 4) {
 		partition = new SwitchRRPool(of);
@@ -990,10 +1081,12 @@ public class openflow extends Driver {
 	    */
 	    Selector readSelector = readSelectors.get(workerID);
 	    Iterator<SelectionKey> key = null;
+
+	    long thetime = 0, before = 0, num = 0;
+		
 	    while (true) {
 		Switch sw = null;
 		if (Parameters.mode == 1) {
-		    
 		    if (idx < of.getRRPool().getSize()) {
 			sw = of.getRRPool().getSwitchAt(idx++);
 		    }
@@ -1002,12 +1095,41 @@ public class openflow extends Driver {
 			    //skipped.clear();
 			    idx = 0;
 			    trySkipped = 0;
+			    /*
+			    long now = System.nanoTime();
+			    if (Parameters.warmuped) {
+				thetime += now - before;
+				num ++;
+
+				if (num % 10000 == 0) {
+				    System.err.println(thetime / (num*1000));
+				}
+			    }
+			    before = now;
+			    */
+
+			    
+			    //if (of.whoSel == workerID) {
+			    if (workerID == 0) {
+				//if (!of.selecting) {
+				//of.selecting = true;
+				select();
+				//of.selecting = false;
+				//of.whoSel = (of.whoSel+1)%Parameters.divide;
+			    }
+			    
+
 			    continue;
 			} else {
 			    sw = skipped.removeFirst();
 			    trySkipped ++;
 			}
 		    }
+
+		    if (!sw.active) {
+			continue;
+		    }
+		    
 		    /*
 		    if (sw.zeroes > 1000) {
 			if (of.random.nextInt(100) >= 10) {
@@ -1064,8 +1186,10 @@ public class openflow extends Driver {
 			    }
 			    continue;
 			}
-			else
+			else {
 			    sw.chopping = true;
+			    //sw.active = false;
+			}
 		    }
 		} else if (Parameters.mode == 2) {
 		    /* //. Not good select code for flushing
@@ -1288,7 +1412,7 @@ public class openflow extends Driver {
 				}
 			    }
 
-			    /*
+			    
 			    if (Parameters.warmuped && workerID == 0) {
 				if ((now - lastPrint) > 10000000L) {
 				    lastPrint = now;
@@ -1296,7 +1420,7 @@ public class openflow extends Driver {
 				    delaylog.flush();
 				}
 			    }
-			    */
+			    
 			    
 			    if (Parameters.useIBTAdaptation) {
 				/*

@@ -63,6 +63,7 @@ public class LocationManagementApp extends App {
 	    }
 	    if (pi.reason == 1) {
 		if (!Parameters.warmuped) {
+		    System.err.println("Warmup");
 		    Parameters.warmuped = true;
 		    //Parameters.am.dataLogMgr.addEntry(new LogContent(pi.dpid, -1));
 		}
