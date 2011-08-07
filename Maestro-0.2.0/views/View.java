@@ -22,9 +22,12 @@ package views;
 
 import java.io.Serializable;
 import java.util.concurrent.Semaphore;
+import java.util.ArrayList;
 
 import drivers.*;
 import events.*;
+import events.openflow.PacketInEvent;
+
 
 /**
  * The abstract class for a View in Maestro
@@ -90,6 +93,10 @@ public abstract class View implements Serializable {
      * @return Whether this view should be considered as changed, to trigger DAGs to run
      */
     public abstract boolean processEvent(Event e);
+
+    public boolean processEvents(ArrayList<PacketInEvent> es) {
+	return true;
+    }
 	
     /** 
      * Commit this view, generate necessary configuration messages

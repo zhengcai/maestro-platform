@@ -58,7 +58,8 @@ public class LearningSwitchesApp extends App {
 
 	ArrayList<PacketInEvent> work = pis.incoming;
 
-		
+
+	long thedpid = 0;
 	for (PacketInEvent pi : work) {
 	    if (pi.reason == 1) {
 		if (!Parameters.warmuped) {
@@ -148,6 +149,8 @@ public class LearningSwitchesApp extends App {
 		}
 		po.actionsLen = po.actions[0].len;
 		pkts.addPacketOutEvent(po);
+		
+		thedpid = pi.dpid;
 	    }
 
 

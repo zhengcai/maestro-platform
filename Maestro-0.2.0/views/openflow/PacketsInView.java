@@ -70,6 +70,26 @@ public class PacketsInView extends View {
 	}
 	*/
     }
+
+    public boolean processEvents(ArrayList<PacketInEvent> es) {
+	incoming = es;
+	return true;
+	/*
+	boolean flush = false;
+	for (Event e : es) {
+	    if (((PacketInEvent)e).flush)
+		flush = true;
+
+	    if (!((PacketInEvent)e).dummy)
+		incoming.add((PacketInEvent)e);
+
+	    if (flush) {
+		return incoming.size() > 0;
+	    }
+	}
+	return false;
+	*/
+    }
     
     @Override
 	public boolean whetherInterested(Event e) {

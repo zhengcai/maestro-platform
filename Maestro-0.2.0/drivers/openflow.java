@@ -90,7 +90,6 @@ public class openflow extends Driver {
 	}
 
 	public boolean send(ByteBuffer pkt) {
-	    int ret = 0;
 	    sending = true;
 	    synchronized(channel) {
 		try {
@@ -126,6 +125,7 @@ public class openflow extends Driver {
 		    //e.printStackTrace();
 		}
 	    }
+
 	    sending = false;
 	    return true;
 	}
@@ -401,6 +401,7 @@ public class openflow extends Driver {
 				    
 				    sw.totalProcessed += msgs.size();
 				    Parameters.totalProcessed += msgs.size();
+				    //Parameters.am.workerMgr.increaseCounter(msgs.size());
 				}
 				
 				while (msgsQueue.size() > PENDING) {
@@ -553,6 +554,43 @@ public class openflow extends Driver {
 	}
 	return false;
     }
+
+    public boolean dispatchPackets(ArrayList<RawMessage> msgs, /*Switch sw, byte[] buffer, int pos, int size,*/ boolean flush) {
+	if (msgs.size() == 0)
+	    return false;
+	RawMessage msg = msgs.get(0);
+	int pos = msg.start;
+    	short type = Utilities.getNetworkBytesUint8(msg.buf, pos+1);
+	int length = Utilities.getNetworkBytesUint16(msg.buf, pos+2);
+	switch(type) {
+	case OFPConstants.PacketTypes.OFPT_HELLO:
+	    //Utilities.printlnDebug("Got hello");
+	    sendFeatureRequest(msg.sw);
+	    break;
+	case OFPConstants.PacketTypes.OFPT_ECHO_REQUEST:
+	    //Utilities.printlnDebug("Got echo");
+	    Utilities.setNetworkBytesUint8(msg.buf, pos+1, OFPConstants.PacketTypes.OFPT_ECHO_REPLY);	    
+	    ByteBuffer buf = ByteBuffer.allocate(length);
+	    if (msg.length != length) {
+		Utilities.printlnDebug("BAD! In handling echo_request: size != length");
+	    } else {
+		buf.put(msg.buf, pos, length);
+	    }
+	    msg.sw.send(buf);
+	    break;
+	case OFPConstants.PacketTypes.OFPT_FEATURES_REPLY:
+	    //Utilities.printlnDebug("Got features_reply");
+	    handleFeaturesReply(msg.sw, msg.buf, pos, length);
+	    break;
+	case OFPConstants.PacketTypes.OFPT_PACKET_IN:
+	    return handlePacketIns(msgs, flush);
+	    //break;
+	default:
+	    break;
+	}
+	return false;
+    }
+
     
     public void handleFeaturesReply(Switch sw, byte[] buffer, int pos, int length) {
     	pos += OFPConstants.OfpConstants.OFP_HEADER_LEN;
@@ -711,6 +749,109 @@ public class openflow extends Driver {
 	}
     }
 
+    public boolean handlePacketIns(ArrayList<RawMessage> msgs, boolean flush) {
+	ArrayList<PacketInEvent> pis = new ArrayList<PacketInEvent>();
+	for (RawMessage msg : msgs) {
+	    int pos = msg.start;
+	    PacketInEvent pi;
+	    if (Parameters.useMemoryMgnt) {
+		pi = Parameters.am.memMgr.allocPacketInEvent();
+	    } else {
+		pi = new PacketInEvent();
+	    }
+	    pi.flush = flush;
+    	
+	    pi.xid = Utilities.getNetworkBytesUint32(msg.buf, pos+4);
+	    pos += OFPConstants.OfpConstants.OFP_HEADER_LEN;
+	    pi.dpid = msg.sw.dpid;
+	    pi.bufferId = Utilities.getNetworkBytesUint32(msg.buf, pos);
+	    pos += 4;
+	    pi.totalLen = Utilities.getNetworkBytesUint16(msg.buf, pos);
+	    pos += 2;
+	    pi.inPort = Utilities.getNetworkBytesUint16(msg.buf, pos);
+	    pos += 2;
+	    pi.reason = Utilities.getNetworkBytesUint8(msg.buf, pos);
+	    pos += 2; //. including 1 byte pad
+    	
+	    /*
+	      Utilities.Assert(pi.totalLen == (length-OFPConstants.OfpConstants.OFP_PACKET_IN_LEN), 
+	      String.format("unmatched PacketIn data length: totalLen=%d bufLen=%d", 
+	      pi.totalLen, (length-OFPConstants.OfpConstants.OFP_PACKET_IN_LEN)));
+	
+	
+	      if (Parameters.useMemoryMgnt) {
+	      pi.data = Parameters.am.memMgr.allocPacketInEventDataPayload(pi.totalLen);
+	      }
+	      else {
+	      pi.data = new PacketInEvent.DataPayload(pi.totalLen);
+	      }
+	
+	      Utilities.memcpy(pi.data.data, 0, buffer, pos, pi.totalLen);
+	    */
+
+	    ///////////////////// WARNING: CURRENT A HACK HERE, IGNORING pi.totalLen
+	    pi.totalLen = msg.length-OFPConstants.OfpConstants.OFP_PACKET_IN_LEN;
+	    if (Parameters.useMemoryMgnt) {
+		pi.data = Parameters.am.memMgr.allocPacketInEventDataPayload(pi.totalLen);
+	    }
+	    else {
+		pi.data = new PacketInEvent.DataPayload(pi.totalLen);
+	    }
+
+	    Utilities.memcpy(pi.data.data, 0, msg.buf, pos, pi.totalLen);
+	    ////////////////////////////////
+
+	    //. Currently assume that all packets are ethernet frames
+	    EthernetHeader eth;
+	    if (Parameters.useMemoryMgnt) {
+		eth = Parameters.am.memMgr.allocEthernetHeader();
+	    } else {
+		eth = new EthernetHeader();
+	    }
+	    pos = eth.parseHeader(msg.buf, pos);
+	    pi.extractFlowInfo(eth);
+
+	    if (OFPConstants.OfpConstants.ETH_TYPE_LLDP == pi.flow.dlType) {
+		LLDPPacketInEvent lldp = new LLDPPacketInEvent();
+		if(!(eth.inner instanceof LLDPHeader)) {
+		    Utilities.printlnDebug("The LLDP packet is not correctly formated");
+		    return false;
+		}
+		LLDPHeader lldpHeader = (LLDPHeader)eth.inner;
+		lldp.srcDpid = Utilities.getNetworkBytesUint64(lldpHeader.chassisId.value, 0);
+		lldp.srcPort = Utilities.getNetworkBytesUint16(lldpHeader.portId.value, 0);
+		lldp.ttl = Utilities.getNetworkBytesUint16(lldpHeader.ttl.value, 0);
+	    
+		lldp.dstDpid =pi.dpid;
+		lldp.dstPort = pi.inPort;
+		if (Parameters.useMemoryMgnt) {
+		    Parameters.am.memMgr.freePacketInEvent(pi);
+		    eth.free();
+		}
+		if (msg.sw.dpid == 0) {
+		    synchronized(msg.sw.lldpQueue) {
+			msg.sw.lldpQueue.addLast(lldp);
+		    }
+		} else {
+		    vm.postEvent(lldp);
+		}
+		return false;
+	    } else {
+		//eth.free();
+	    }
+
+	    eth.free();
+	    pis.add(pi);
+	}
+
+	if (Parameters.divide > 0) {
+	    int toWhich = Parameters.am.workerMgr.getCurrentWorkerID();
+	    vm.postEventConcurrents(pis, toWhich);
+	}
+	return true;
+    }
+
+
     /**
      * The worker thread is free, flush all the batched PacketsInEvent to be 
      * processed immediately
@@ -780,7 +921,7 @@ public class openflow extends Driver {
 	    ret = processToSpecificSwitchEvent(events);
 
 	    if (ret) {
-		Parameters.am.workerMgr.increaseCounter(size);
+		//Parameters.am.workerMgr.increaseCounter(size);
 		
 		if (Parameters.am.dataLogMgr.enabled) {
 		    Parameters.am.dataLogMgr.addEntry(new LogContent(((PacketOutEvent)e).dpid, size));
@@ -844,9 +985,12 @@ public class openflow extends Driver {
 	Partition pt = new Partition();
 	pt.dpid = dpid;
 	pt.sw = target;
+
+	int each = 0;
 	for (Event e : events) {
 	    ToSpecificSwitchEvent tsse = (ToSpecificSwitchEvent)e;
 	    pt.totalLength += tsse.getLength();
+	    each = tsse.getLength();
 	}
 	pt.es = events;
 
@@ -907,6 +1051,9 @@ public class openflow extends Driver {
 	    */
 
 	    int size = pt.es.size();
+	    //if (pt.dpid == 5) {
+	    //System.err.println("The final size is "+pt.totalLength+", each is "+each);
+	    //}
 	    if (Parameters.batchOutput) {
 		ByteBuffer pkt = pt.toPacket();
 		boolean ret = SendPktOut(pt.dpid, pkt);
@@ -934,6 +1081,7 @@ public class openflow extends Driver {
 	    
 	    if ( pt.es.get(0) instanceof PacketOutEvent) {
 		target.poPushed += size;
+		//Parameters.am.workerMgr.increaseCounter(size);
 	    }
 	    
 	    
@@ -1316,6 +1464,7 @@ public class openflow extends Driver {
 			voidRead = 0;
 			sw.totalProcessed += msgs.size();
 			Parameters.totalProcessed += msgs.size();
+			Parameters.am.workerMgr.increaseCounter(msgs.size());
 		    } catch (IOException e) {
 			//e.printStackTrace();
 			//of.print();
@@ -1355,130 +1504,140 @@ public class openflow extends Driver {
 		    }
 		}
 
-		for (RawMessage msg : msgs) {
-		    if (batched >= ibt) {
-			if (of.dispatchPacket(msg.sw, msg.buf, msg.start, msg.length, true)) {
-			    long now = System.nanoTime();
-			    long allTime = (now - begin) / 1000; //. Microsecond
-			    double score = ((double)batched) / (allTime);
-			    //double score = ((double)(5000-allTime)*batched) / (5000*allTime);
-			    //double score = ((double)batched*10000) / (allTime) - ((double)allTime);
+		if (Parameters.mode == 4) {
+		    /*
+		    int i = 0;
+		    for (RawMessage msg : msgs) {
+			if (i == msgs.size()-1)
+			    of.dispatchPacket(msg.sw, msg.buf, msg.start, msg.length, true);
+			else
+			    batched += of.dispatchPacket(msg.sw, msg.buf, msg.start, msg.length, false) ? 1 : 0;
+			i++;
+		    }
+		    */
+		    of.dispatchPackets(msgs, true);
+		}
+		else {
+		    for (RawMessage msg : msgs) {
+			if (batched >= ibt) {
+			    if (of.dispatchPacket(msg.sw, msg.buf, msg.start, msg.length, true)) {
+				long now = System.nanoTime();
+				long allTime = (now - begin) / 1000; //. Microsecond
+				double score = ((double)batched) / (allTime);
+				//double score = ((double)(5000-allTime)*batched) / (5000*allTime);
+				//double score = ((double)batched*10000) / (allTime) - ((double)allTime);
 			    
-			    double realScore = score;
-			    //. Adding history into the evaluation
-			    int hisIdx = ibt / step;
-			    if (history[hisIdx] == 0) {
-				history[hisIdx] = score;
-			    } else {
-				score = (score*(100-HistoryWeight) + history[hisIdx]*HistoryWeight) / 100;
-				history[hisIdx] = score;
-			    }
-
-			    if (Parameters.dynamicExp && Parameters.warmuped && workerID == 0) {
-				if ((now - lastPrint) > 10000000L) {
-				    //System.err.println(ibt+" "+increasing+" "+score+" ("+realScore+") "+lastScore+" "+allTime+" || best "+bestScore+" at "+bestDelayForScore);
-				    ibtlog.println((timeStamp++)*10+" "+ibt);
-				    ibtlog.flush();
-				}
-				
-				if (Parameters.whenWarmuped != 0) {
-				    if (stepOne && (now - Parameters.whenWarmuped) > 10000000000L) {
-					Parameters.bufferId = 4;
-					ibtlog.println("Now starting rate 4");
-					System.err.println("Now starting rate 4");
-					stepOne = false;
-				    }
-
-				    if (stepTwo && (now - Parameters.whenWarmuped) > 20000000000L) {
-					Parameters.bufferId = 8;
-					ibtlog.println("Now starting rate 8");
-					System.err.println("Now starting rate 8");
-					stepTwo = false;
-				    }
-
-				    if (stepThree && (now - Parameters.whenWarmuped) > 30000000000L) {
-					Parameters.bufferId = 4;
-					ibtlog.println("Now starting rate 4");
-					System.err.println("Now starting rate 4");
-					stepThree = false;
-				    }
-
-				    if (stepFour && (now - Parameters.whenWarmuped) > 40000000000L) {
-					Parameters.bufferId = 0;
-					ibtlog.println("Now starting rate 0");
-					System.err.println("Now starting rate 0");
-					stepFour = false;
-				    }
-				}
-			    }
-
-			    
-			    if (Parameters.warmuped && workerID == 0) {
-				if ((now - lastPrint) > 10000000L) {
-				    lastPrint = now;
-				    delaylog.println(allTime);
-				    delaylog.flush();
-				}
-			    }
-			    
-			    
-			    if (Parameters.useIBTAdaptation) {
-				/*
-				if (score > bestScore) {
-				    bestScore = score;
-				    bestIbt = ibt;
-				    bestDelayForScore = allTime;
-				}
-				*/
-				
-				if (allTime > MaxDelay || !congested
-				    /*||(allTime > (bestDelayForScore<<1) && ibt > bestIbt)*/) {
-				    increasing = false;
-				    if (ibt <= step)
-					ibt = step;
-				    else
-					ibt -= step;
-				    
+				double realScore = score;
+				//. Adding history into the evaluation
+				int hisIdx = ibt / step;
+				if (history[hisIdx] == 0) {
+				    history[hisIdx] = score;
 				} else {
-				    if (score > lastScore) { //. Better
-					
-				    } else { //. Worse
-					increasing = !increasing;				    
+				    score = (score*(100-HistoryWeight) + history[hisIdx]*HistoryWeight) / 100;
+				    history[hisIdx] = score;
+				}
+
+				if (Parameters.dynamicExp && Parameters.warmuped && workerID == 0) {
+				    if ((now - lastPrint) > 10000000L) {
+					//System.err.println(ibt+" "+increasing+" "+score+" ("+realScore+") "+lastScore+" "+allTime+" || best "+bestScore+" at "+bestDelayForScore);
+					ibtlog.println((timeStamp++)*10+" "+ibt);
+					ibtlog.flush();
 				    }
-				    if (increasing && congested) {
-					ibt += step;
-					/*
-					if (ibt > maxIbt)
-					    maxIbt = ibt;
-					*/
-				    } else {
+				
+				    if (Parameters.whenWarmuped != 0) {
+					if (stepOne && (now - Parameters.whenWarmuped) > 10000000000L) {
+					    Parameters.bufferId = 4;
+					    ibtlog.println("Now starting rate 4");
+					    System.err.println("Now starting rate 4");
+					    stepOne = false;
+					}
+
+					if (stepTwo && (now - Parameters.whenWarmuped) > 20000000000L) {
+					    Parameters.bufferId = 8;
+					    ibtlog.println("Now starting rate 8");
+					    System.err.println("Now starting rate 8");
+					    stepTwo = false;
+					}
+
+					if (stepThree && (now - Parameters.whenWarmuped) > 30000000000L) {
+					    Parameters.bufferId = 4;
+					    ibtlog.println("Now starting rate 4");
+					    System.err.println("Now starting rate 4");
+					    stepThree = false;
+					}
+
+					if (stepFour && (now - Parameters.whenWarmuped) > 40000000000L) {
+					    Parameters.bufferId = 0;
+					    ibtlog.println("Now starting rate 0");
+					    System.err.println("Now starting rate 0");
+					    stepFour = false;
+					}
+				    }
+				}
+
+			    
+				if (Parameters.warmuped && workerID == 0) {
+				    if ((now - lastPrint) > 10000000L) {
+					lastPrint = now;
+					delaylog.println(allTime);
+					delaylog.flush();
+				    }
+				}
+			    
+			    
+				if (Parameters.useIBTAdaptation) {
+				    /*
+				      if (score > bestScore) {
+				      bestScore = score;
+				      bestIbt = ibt;
+				      bestDelayForScore = allTime;
+				      }
+				    */
+				
+				    if (allTime > MaxDelay || !congested
+					/*||(allTime > (bestDelayForScore<<1) && ibt > bestIbt)*/) {
+					increasing = false;
 					if (ibt <= step)
 					    ibt = step;
 					else
 					    ibt -= step;
+				    
+				    } else {
+					if (score > lastScore) { //. Better
+					
+					} else { //. Worse
+					    increasing = !increasing;				    
+					}
+					if (increasing && congested) {
+					    ibt += step;
+					    /*
+					      if (ibt > maxIbt)
+					      maxIbt = ibt;
+					    */
+					} else {
+					    if (ibt <= step)
+						ibt = step;
+					    else
+						ibt -= step;
+					}
 				    }
 				}
-			    }
 
-			    if (Parameters.mode == 4) {
-				ibt = 750;
+				lastScore = score;
+				congested = false;
+				batched = 0;
+				begin = System.nanoTime();
 			    }
-			    
-			    
-			    lastScore = score;
-			    congested = false;
-			    batched = 0;
-			    begin = System.nanoTime();
+			} else {
+			    batched += of.dispatchPacket(msg.sw, msg.buf, msg.start, msg.length, false) ? 1 : 0;
+			    /*
+			      if (batched == 1) {
+			      begin = System.nanoTime();
+			      }
+			    */
 			}
-		    } else {
-			batched += of.dispatchPacket(msg.sw, msg.buf, msg.start, msg.length, false) ? 1 : 0;
-			/*
-			if (batched == 1) {
-			    begin = System.nanoTime();
-			}
-			*/
-		    }
-		} //. End of for loop
+		    } //. End of for loop
+		} //. End of if mode == 4
 
 		/*
 		if (Parameters.totalProcessed > 40000000 && workerID == 0) {

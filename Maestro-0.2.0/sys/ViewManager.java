@@ -22,10 +22,12 @@ package sys;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.concurrent.Semaphore;
 
 import drivers.Driver;
 import events.Event;
+import events.openflow.PacketInEvent;
 import views.View;
 
 /**
@@ -148,6 +150,32 @@ public class ViewManager {
 	}
 
 	if (v.processEvent(e)) {
+	    if (whetherConcurrentEnabled)
+		am.triggerDag(global, viewName+"_"+which);
+	    else
+		am.triggerDag(global, viewName);
+	}
+    }
+
+    public void postEventConcurrents(ArrayList<PacketInEvent> es, int which) {
+	Event e = es.get(0);
+	String viewName = eventToView.get(e.getClass().getSimpleName());
+	if (viewName == null) {
+	    return;
+	}
+
+	boolean whetherConcurrentEnabled = true;
+
+	View v = global.getView(viewName+"_"+which);
+	if (v == null) {
+	    whetherConcurrentEnabled = false;
+	    v = global.getView(viewName);
+	    if (v == null) {
+		return;
+	    }
+	}
+
+	if (v.processEvents(es)) {
 	    if (whetherConcurrentEnabled)
 		am.triggerDag(global, viewName+"_"+which);
 	    else
