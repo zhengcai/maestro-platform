@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>Maestro Platform by zhengcai</title>
+  </head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>Maestro Platform</h1>
+        <h2>A scalable control platform writen in Java which supports OpenFlow switches</h2>
+        <a href="https://github.com/zhengcai/maestro-platform" class="button"><small>View project on</small> GitHub</a>
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <p>Maestro is an "operating system" for orchestrating network control applications. Maestro provides interfaces for implementing modular network control applications to access and modify state of the network, and coordinate their interactions. Maestro is a platform for achieving automatic and programmatic network control functions using these modularized applications. Although this project focuses on building an OpenFlow controller using Maestro, Maestro is not only limited to OpenFlow networks. The programming framework of Maestro provides interfaces for:</p>
+
+<ul>
+<li>Introducing new customized control functions by adding modularized control components.</li>
+<li>Maintaining network state on behalf of the control components.</li>
+<li>Composing control components by specifying the execution sequencing and the shared network state of the components.</li>
+</ul>
+
+<p>Moreover, Maestro tries to exploit parallelism within a single machine to improve the system's throughput performance. The fundamental feature of an OpenFlow network is that the controller is responsible for every flow's initial establishment by contacting related switches. Thus the performance of the controller could be the bottleneck. In designing Maestro we try to require as little effort from programmers as possible to manage the parallelization. Instead Maestro handles most of the tedious and complicated job of managing work load distribution and worker threads scheduling. By design Maestro is both portable and scalable:</p>
+
+<ul>
+<li>Developed in Java (both the platform and the components) - Highly portable to various operating systems and architectures.</li>
+<li>Multi-threaded - Takes full advantage of multi-core processors.</li>
+</ul>
+
+<p>Maestro currently provides the control components for realizing either a learning switch network, or a routed network using OpenFlow switches. Some components such as the command line console, etc, are still not full-fledged. We plan to further enrich and enhance the functionality of Maestro in future releases. Notice that Maestro is licensed under the GNU Lesser General Public License version 2.1. Google-project's LGPL directs only to the version 3, so we make it explicit here that Maestro is licensed under LGPL v2.1.</p>
+
+<p>As a starter, please check the Tutorial Wiki Page.</p>
+
+<p>For more details about using and programming Maestro, please refer to:</p>
+
+<p>Using and Programming Maestro.
+For details about the multi-threading design and performance evaluation of Maestro, please refer to:</p>
+
+<p>Zheng Cai, Alan L. Cox, T. S. Eugene Ng, "Maestro: Balancing Fairness, Latency and Throughput in the OpenFlow Control Plane", Rice University Technical Report TR11-07.
+This work has also resulted in the following theses:</p>
+
+<p>Zheng Cai, "Design and Implementation of the Maestro Network Control Platform", M.S. Thesis, Rice University, 2009. This primarily deals with the abstractions used in Maestro for application functionality composition and interaction.</p>
+
+<p>Zheng Cai, "Maestro: Achieving Scalability and Coordination in Centralized Network Control Plane", Ph.D. Thesis, Rice University, 2011. This primarily deals with the scalability, performance, and applications of Maestro.</p>
+
+<p>A related work leveraging Maestro as the control platform is:</p>
+
+<p>Zheng Cai, Florin Dinu, Jie Zheng, Alan L. Cox, T. S. Eugene Ng, "CONTRACT: Incorporating Coordination into the IP Network Control Plane", IEEE ICDCS'10, Genoa, Italy, June 2010.
+For discussions and questions, please join the Maestro Google group. If you cannot join the Google group, please contact Zheng Cai directly.</p>
+
+<p>The Maestro project is supported by NSF's NeTS FIND Grant No. CNS-0721990.</p>
+
+<p><img src="https://camo.githubusercontent.com/07022dda6f4718fdcbaba7a3dddfa07b09a17ce1/687474703a2f2f7777772e6e73662e676f762f696d616765732f6c6f676f732f6e7366312e676966" alt=""></p>
+
+<p>Key people of the Maestro project: T. S. Eugene Ng (PI), Alan L. Cox (co-PI), Zheng Cai (code maintainer), Florin Dinu, Jie Zheng, all from the department of computer science of Rice University.</p>
+
+<p><img src="https://camo.githubusercontent.com/cc76f85d4de64b10d22dcd2c9e78e41a039a11c4/687474703a2f2f7777772e73746166662e726963652e6564752f696d616765732f73746166662f6272616e64696e672f6c6f676f2e6a7067" alt=""></p>
+        </section>
+
+        <aside id="sidebar">
+          <a href="https://github.com/zhengcai/maestro-platform/zipball/master" class="button">
+            <small>Download</small>
+            .zip file
+          </a>
+          <a href="https://github.com/zhengcai/maestro-platform/tarball/master" class="button">
+            <small>Download</small>
+            .tar.gz file
+          </a>
+
+          <p class="repo-owner"><a href="https://github.com/zhengcai/maestro-platform"></a> is maintained by <a href="https://github.com/zhengcai">zhengcai</a>.</p>
+
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
+    </div>
+
+  
+  </body>
+</html>
